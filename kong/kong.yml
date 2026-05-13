@@ -2,8 +2,8 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  - name: httpbin
-    url: https://httpbin.org
+  - name: local-echo
+    url: http://echo:8080
     routes:
       - name: anything
         paths:

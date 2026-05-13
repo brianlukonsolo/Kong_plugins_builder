@@ -1,0 +1,415 @@
+{
+  "info": {
+    "_postman_id": "b3f6cfc1-ec93-4bb0-8789-547b4f3b3e20",
+    "name": "Kong 3.4.2 Custom Plugins",
+    "description": "Automated smoke tests for the local Kong 3.4.2 Docker Compose setup and custom Lua plugin rocks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health - Kong status API is ready",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{status_url}}/status"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"status API returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"status body is JSON\", function () {",
+              "  pm.expect(pm.response.json()).to.be.an(\"object\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Kong version is 3.4.2",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{admin_url}}/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Admin API returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"Kong version is 3.4.2\", function () {",
+              "  pm.expect(body.version).to.eql(\"3.4.2\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - custom plugins are enabled",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{admin_url}}/plugins/enabled"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"enabled plugins endpoint returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const enabled = JSON.stringify(pm.response.json());",
+              "",
+              "[\"request-profiler\", \"json-field-guard\", \"canary-header-router\"].forEach(function (plugin) {",
+              "  pm.test(plugin + \" is enabled\", function () {",
+              "    pm.expect(enabled).to.include(plugin);",
+              "  });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Proxy - request profiler adds correlation and timing",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Request-Id",
+            "value": "postman-request-profiler"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-profiler"
+          }
+        ],
+        "url": "{{proxy_url}}/anything/get"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "function headerValue(headers, name) {",
+              "  const wanted = name.toLowerCase();",
+              "  const key = Object.keys(headers || {}).find(function (candidate) {",
+              "    return candidate.toLowerCase() === wanted;",
+              "  });",
+              "  return key ? headers[key] : undefined;",
+              "}",
+              "",
+              "pm.test(\"proxy returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"request-profiler response headers are present\", function () {",
+              "  pm.expect(pm.response.headers.get(\"X-Kong-Elapsed\")).to.match(/^\\d+(\\.\\d+)?ms$/);",
+              "  pm.expect(pm.response.headers.get(\"X-Request-Id\")).to.eql(\"postman-request-profiler\");",
+              "});",
+              "",
+              "pm.test(\"canary plugin also annotates the response\", function () {",
+              "  pm.expect(pm.response.headers.get(\"X-Release-Decision\")).to.match(/^(stable|canary)$/);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"upstream echo received the proxied request\", function () {",
+              "  pm.expect(body.method).to.eql(\"GET\");",
+              "  pm.expect(body.path).to.eql(\"/anything/get\");",
+              "  pm.expect(headerValue(body.headers, \"X-Request-Id\")).to.eql(\"postman-request-profiler\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Proxy - canary override forces canary",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Canary-Override",
+            "value": "canary"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-canary"
+          }
+        ],
+        "url": "{{proxy_url}}/anything/headers"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "function headerValue(headers, name) {",
+              "  const wanted = name.toLowerCase();",
+              "  const key = Object.keys(headers || {}).find(function (candidate) {",
+              "    return candidate.toLowerCase() === wanted;",
+              "  });",
+              "  return key ? headers[key] : undefined;",
+              "}",
+              "",
+              "pm.test(\"proxy returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"response shows forced canary\", function () {",
+              "  pm.expect(pm.response.headers.get(\"X-Release-Decision\")).to.eql(\"canary\");",
+              "  pm.expect(pm.response.headers.get(\"X-Release-Reason\")).to.eql(\"forced\");",
+              "});",
+              "",
+              "pm.test(\"upstream received canary track header\", function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(headerValue(body.headers, \"X-Release-Track\")).to.eql(\"canary\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Proxy - canary override forces stable",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Canary-Override",
+            "value": "stable"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-stable"
+          }
+        ],
+        "url": "{{proxy_url}}/anything/headers"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "function headerValue(headers, name) {",
+              "  const wanted = name.toLowerCase();",
+              "  const key = Object.keys(headers || {}).find(function (candidate) {",
+              "    return candidate.toLowerCase() === wanted;",
+              "  });",
+              "  return key ? headers[key] : undefined;",
+              "}",
+              "",
+              "pm.test(\"proxy returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"response shows forced stable\", function () {",
+              "  pm.expect(pm.response.headers.get(\"X-Release-Decision\")).to.eql(\"stable\");",
+              "  pm.expect(pm.response.headers.get(\"X-Release-Reason\")).to.eql(\"forced\");",
+              "});",
+              "",
+              "pm.test(\"upstream received stable track header\", function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(headerValue(body.headers, \"X-Release-Track\")).to.eql(\"stable\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "JSON guard - valid payload is proxied",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customer_id\":\"cust-123\",\"action\":\"signup\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{proxy_url}}/guarded/post"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "function headerValue(headers, name) {",
+              "  const wanted = name.toLowerCase();",
+              "  const key = Object.keys(headers || {}).find(function (candidate) {",
+              "    return candidate.toLowerCase() === wanted;",
+              "  });",
+              "  return key ? headers[key] : undefined;",
+              "}",
+              "",
+              "pm.test(\"valid JSON is proxied\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"guard stripped /guarded and upstream received JSON\", function () {",
+              "  pm.expect(body.path).to.eql(\"/post\");",
+              "  pm.expect(body.json.customer_id).to.eql(\"cust-123\");",
+              "  pm.expect(body.json.action).to.eql(\"signup\");",
+              "});",
+              "",
+              "pm.test(\"upstream received guard pass header\", function () {",
+              "  pm.expect(headerValue(body.headers, \"X-Json-Guard\")).to.eql(\"passed\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "JSON guard - missing required field is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customer_id\":\"cust-123\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{proxy_url}}/guarded/post"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"missing required field returns 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"response names the missing field\", function () {",
+              "  pm.expect(body.message).to.eql(\"Required JSON fields are missing\");",
+              "  pm.expect(body.missing).to.include(\"action\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "JSON guard - forbidden key is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"customer_id\":\"cust-123\",\"action\":\"signup\",\"password\":\"secret\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{proxy_url}}/guarded/post"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"forbidden key returns 422\", function () {",
+              "  pm.response.to.have.status(422);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"response names the forbidden key\", function () {",
+              "  pm.expect(body.message).to.eql(\"Forbidden JSON fields are present\");",
+              "  pm.expect(body.forbidden).to.include(\"password\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "JSON guard - non-JSON payload is rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/plain"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "customer_id=cust-123&action=signup"
+        },
+        "url": "{{proxy_url}}/guarded/post"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"non-JSON payload returns 415\", function () {",
+              "  pm.response.to.have.status(415);",
+              "});",
+              "",
+              "pm.test(\"response explains that JSON is required\", function () {",
+              "  pm.expect(pm.response.json().message).to.eql(\"JSON payload required\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,11 @@
 services:
+  echo:
+    build:
+      context: .
+      dockerfile: docker/echo-server.Dockerfile
+    image: local/kong-plugins-echo:latest
+    container_name: kong-plugins-echo
+
   kong:
     build:
       context: .
@@ -20,11 +27,13 @@ services:
       KONG_REQUIRE_ROCKS: "true"
       KONG_ROCKS_DIR: /rocks
       KONG_STATUS_LISTEN: 0.0.0.0:8100
+    depends_on:
+      - echo
     ports:
-      - "8000:8000"
-      - "8443:8443"
-      - "8001:8001"
-      - "8100:8100"
+      - "${KONG_PROXY_PORT:-8000}:8000"
+      - "${KONG_PROXY_SSL_PORT:-8443}:8443"
+      - "${KONG_ADMIN_PORT:-8001}:8001"
+      - "${KONG_STATUS_PORT:-8100}:8100"
     volumes:
       - ./build/out:/rocks:ro
       - ./kong/kong.yml:/kong/declarative/kong.yml:ro
