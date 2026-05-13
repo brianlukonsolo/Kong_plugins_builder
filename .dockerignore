@@ -1,0 +1,7 @@
+.git
+.idea
+.mvn
+.venv
+build
+target
+*.rock

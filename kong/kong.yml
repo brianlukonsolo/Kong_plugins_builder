@@ -1,0 +1,57 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: httpbin
+    url: https://httpbin.org
+    routes:
+      - name: anything
+        paths:
+          - /anything
+        strip_path: false
+      - name: guarded-json
+        paths:
+          - /guarded
+        strip_path: true
+        methods:
+          - POST
+          - PUT
+          - PATCH
+        plugins:
+          - name: json-field-guard
+            config:
+              methods:
+                - POST
+                - PUT
+                - PATCH
+              required_fields:
+                - customer_id
+                - action
+              forbidden_keys:
+                - password
+                - ssn
+                - credit_card
+              max_payload_bytes: 32768
+              require_json: true
+              upstream_status_header: X-Json-Guard
+
+plugins:
+  - name: request-profiler
+    config:
+      request_header: X-Request-Id
+      response_time_header: X-Kong-Elapsed
+      echo_request_id: true
+      log_summary: true
+  - name: canary-header-router
+    config:
+      percentage: 25
+      stickiness_header: X-User-Id
+      force_header: X-Canary-Override
+      force_canary_value: canary
+      force_stable_value: stable
+      upstream_header: X-Release-Track
+      canary_value: canary
+      stable_value: stable
+      bucket_header: X-Release-Bucket
+      response_header: X-Release-Decision
+      reason_header: X-Release-Reason
