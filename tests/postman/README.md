@@ -14,7 +14,7 @@ The collection validates the local Kong 3.4.2 setup end to end:
 From the repo root:
 
 ```powershell
-.\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1
 ```
 
 The script:
@@ -32,10 +32,10 @@ If `newman` is not installed locally, the script falls back to the `postman/newm
 ## Useful Options
 
 ```powershell
-.\postman\run-collection.ps1 -SkipPackage
-.\postman\run-collection.ps1 -KeepRunning
-.\postman\run-collection.ps1 -UseDockerNewman
-.\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
+.\tests\postman\run-collection.ps1 -SkipPackage
+.\tests\postman\run-collection.ps1 -KeepRunning
+.\tests\postman\run-collection.ps1 -UseDockerNewman
+.\tests\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
 ```
 
 ## Manual Postman Use

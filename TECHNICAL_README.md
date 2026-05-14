@@ -948,12 +948,14 @@ installing Kong plugin rock: /rocks/kong-plugin-my-work-plugin-0.1.0-1.all.rock
 kong-plugin-my-work-plugin 0.1.0-1 is now installed in /usr/local
 ```
 
-### Step 9: Add Postman tests
+### Step 9: Add smoke tests
 
 Update:
 
 ```text
-postman/Kong_3_4_2_Custom_Plugins.postman_collection.json
+tests/postman/Kong_3_4_2_Custom_Plugins.postman_collection.json
+tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json
+tests/bash/run-curl-tests.sh
 ```
 
 Add requests and assertions that prove your plugin works.
@@ -961,15 +963,15 @@ Add requests and assertions that prove your plugin works.
 Run:
 
 ```powershell
-.\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1
 ```
 
-## 11. Postman/Newman Automation
+## 11. Smoke Test Automation
 
 The runner script is:
 
 ```text
-postman/run-collection.ps1
+tests/postman/run-collection.ps1
 ```
 
 It performs:
@@ -997,13 +999,20 @@ Postman summary: requests=10/10, assertions=27/27, failures=0
 Useful commands:
 
 ```powershell
-.\postman\run-collection.ps1
-.\postman\run-collection.ps1 -SkipPackage
-.\postman\run-collection.ps1 -KeepRunning
-.\postman\run-collection.ps1 -UseDockerNewman
+.\tests\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1 -SkipPackage
+.\tests\postman\run-collection.ps1 -KeepRunning
+.\tests\postman\run-collection.ps1 -UseDockerNewman
 ```
 
 The script also detects busy default ports and chooses free alternatives for the run.
+
+The same request coverage is available without Postman:
+
+| Format | Location | Notes |
+| --- | --- | --- |
+| Insomnia | `tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json` | Import into Insomnia and run the collection with the `Kong 3.4.2 Local` environment |
+| Bash/curl | `tests/bash/run-curl-tests.sh` | Run `bash tests/bash/run-curl-tests.sh` after Kong is already running |
 
 ## 12. Verification Commands
 
@@ -1054,7 +1063,13 @@ curl http://localhost:8001/plugins
 Run automated tests:
 
 ```powershell
-.\postman\run-collection.ps1 -UseDockerNewman
+.\tests\postman\run-collection.ps1 -UseDockerNewman
+```
+
+Or run the curl-based checks against an already-running stack:
+
+```sh
+bash tests/bash/run-curl-tests.sh
 ```
 
 ## 13. Common Failure Modes
@@ -1178,10 +1193,14 @@ For work plugins, keep the loop tight:
 docker compose logs -f kong
 ```
 
-5. Run Postman/Newman:
+5. Run smoke tests:
 
 ```powershell
-.\postman\run-collection.ps1 -SkipPackage
+.\tests\postman\run-collection.ps1 -SkipPackage
+```
+
+```sh
+bash tests/bash/run-curl-tests.sh
 ```
 
 Use `-SkipPackage` only when you know `build/out` already contains fresh rocks.
@@ -1217,7 +1236,7 @@ Before calling a plugin ready, verify:
 - Plugin instance appears in `kong/kong.yml`.
 - Kong starts cleanly.
 - Admin API shows the plugin enabled.
-- Postman/Newman tests prove the behavior.
+- Smoke tests prove the behavior.
 
 The most important distinction is:
 

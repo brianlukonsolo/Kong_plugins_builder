@@ -1,0 +1,433 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-14T00:00:00.000Z",
+  "__export_source": "codex:postman-to-insomnia",
+  "resources": [
+    {
+      "_id": "wrk_kong_342_custom_plugins",
+      "parentId": null,
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "Kong 3.4.2 Custom Plugins",
+      "description": "Automated smoke tests for the local Kong 3.4.2 Docker Compose setup and custom Lua plugin rocks.",
+      "scope": "collection",
+      "_type": "workspace"
+    },
+    {
+      "_id": "env_kong_342_local",
+      "parentId": "wrk_kong_342_custom_plugins",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "Kong 3.4.2 Local",
+      "data": {
+        "proxy_url": "http://localhost:8000",
+        "admin_url": "http://localhost:8001",
+        "status_url": "http://localhost:8100"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "proxy_url",
+          "admin_url",
+          "status_url"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1778716800000,
+      "environmentType": "kv",
+      "_type": "environment"
+    },
+    {
+      "_id": "fld_health",
+      "parentId": "wrk_kong_342_custom_plugins",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "Health",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1778716800000,
+      "environmentType": "kv",
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_admin",
+      "parentId": "wrk_kong_342_custom_plugins",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "Admin",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1778716799999,
+      "environmentType": "kv",
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_proxy",
+      "parentId": "wrk_kong_342_custom_plugins",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "Proxy",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1778716799998,
+      "environmentType": "kv",
+      "_type": "request_group"
+    },
+    {
+      "_id": "fld_json_guard",
+      "parentId": "wrk_kong_342_custom_plugins",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "name": "JSON guard",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1778716799997,
+      "environmentType": "kv",
+      "_type": "request_group"
+    },
+    {
+      "_id": "req_01_health_kong_status_api_is_ready",
+      "parentId": "fld_health",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.status_url }}/status",
+      "name": "Health - Kong status API is ready",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('status API returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('status body is JSON', () => {\n  insomnia.expect(body).to.be.an('object');\n});",
+      "metaSortKey": -1778716800000,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_02_admin_kong_version_is_3_4_2",
+      "parentId": "fld_admin",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.admin_url }}/",
+      "name": "Admin - Kong version is 3.4.2",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('Admin API returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('Kong version is 3.4.2', () => {\n  insomnia.expect(body.version).to.eql('3.4.2');\n});",
+      "metaSortKey": -1778716799999,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_03_admin_custom_plugins_are_enabled",
+      "parentId": "fld_admin",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.admin_url }}/plugins/enabled",
+      "name": "Admin - custom plugins are enabled",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('enabled plugins endpoint returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\nconst enabled = JSON.stringify(insomnia.response.json());\n\n['request-profiler', 'json-field-guard', 'canary-header-router'].forEach((plugin) => {\n  insomnia.test(plugin + ' is enabled', () => {\n    insomnia.expect(enabled).to.include(plugin);\n  });\n});",
+      "metaSortKey": -1778716799998,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_04_proxy_request_profiler_adds_correlation_and_timing",
+      "parentId": "fld_proxy",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/anything/get",
+      "name": "Proxy - request profiler adds correlation and timing",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "X-Request-Id",
+          "value": "postman-request-profiler",
+          "id": "pair_1",
+          "disabled": false
+        },
+        {
+          "name": "X-User-Id",
+          "value": "user-profiler",
+          "id": "pair_2",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "function responseHeader(name) {\n  const wanted = name.toLowerCase();\n  const header = (insomnia.response.headers || []).find((candidate) => {\n    const key = candidate.key || candidate.name || '';\n    return key.toLowerCase() === wanted;\n  });\n  return header ? header.value : undefined;\n}\n\nfunction requestHeader(headers, name) {\n  const wanted = name.toLowerCase();\n  const key = Object.keys(headers || {}).find((candidate) => candidate.toLowerCase() === wanted);\n  return key ? headers[key] : undefined;\n}\n\ninsomnia.test('proxy returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\ninsomnia.test('request-profiler response headers are present', () => {\n  insomnia.expect(responseHeader('X-Kong-Elapsed')).to.match(/^\\d+(\\.\\d+)?ms$/);\n  insomnia.expect(responseHeader('X-Request-Id')).to.eql('postman-request-profiler');\n});\n\ninsomnia.test('canary plugin also annotates the response', () => {\n  insomnia.expect(responseHeader('X-Release-Decision')).to.match(/^(stable|canary)$/);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('upstream echo received the proxied request', () => {\n  insomnia.expect(body.method).to.eql('GET');\n  insomnia.expect(body.path).to.eql('/anything/get');\n  insomnia.expect(requestHeader(body.headers, 'X-Request-Id')).to.eql('postman-request-profiler');\n});",
+      "metaSortKey": -1778716799997,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_05_proxy_canary_override_forces_canary",
+      "parentId": "fld_proxy",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/anything/headers",
+      "name": "Proxy - canary override forces canary",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "X-Canary-Override",
+          "value": "canary",
+          "id": "pair_1",
+          "disabled": false
+        },
+        {
+          "name": "X-User-Id",
+          "value": "user-canary",
+          "id": "pair_2",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "function responseHeader(name) {\n  const wanted = name.toLowerCase();\n  const header = (insomnia.response.headers || []).find((candidate) => {\n    const key = candidate.key || candidate.name || '';\n    return key.toLowerCase() === wanted;\n  });\n  return header ? header.value : undefined;\n}\n\nfunction requestHeader(headers, name) {\n  const wanted = name.toLowerCase();\n  const key = Object.keys(headers || {}).find((candidate) => candidate.toLowerCase() === wanted);\n  return key ? headers[key] : undefined;\n}\n\ninsomnia.test('proxy returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\ninsomnia.test('response shows forced canary', () => {\n  insomnia.expect(responseHeader('X-Release-Decision')).to.eql('canary');\n  insomnia.expect(responseHeader('X-Release-Reason')).to.eql('forced');\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('upstream received canary track header', () => {\n  insomnia.expect(requestHeader(body.headers, 'X-Release-Track')).to.eql('canary');\n});",
+      "metaSortKey": -1778716799996,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_06_proxy_canary_override_forces_stable",
+      "parentId": "fld_proxy",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/anything/headers",
+      "name": "Proxy - canary override forces stable",
+      "description": "",
+      "method": "GET",
+      "body": {},
+      "parameters": [],
+      "headers": [
+        {
+          "name": "X-Canary-Override",
+          "value": "stable",
+          "id": "pair_1",
+          "disabled": false
+        },
+        {
+          "name": "X-User-Id",
+          "value": "user-stable",
+          "id": "pair_2",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "function responseHeader(name) {\n  const wanted = name.toLowerCase();\n  const header = (insomnia.response.headers || []).find((candidate) => {\n    const key = candidate.key || candidate.name || '';\n    return key.toLowerCase() === wanted;\n  });\n  return header ? header.value : undefined;\n}\n\nfunction requestHeader(headers, name) {\n  const wanted = name.toLowerCase();\n  const key = Object.keys(headers || {}).find((candidate) => candidate.toLowerCase() === wanted);\n  return key ? headers[key] : undefined;\n}\n\ninsomnia.test('proxy returns 200', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\ninsomnia.test('response shows forced stable', () => {\n  insomnia.expect(responseHeader('X-Release-Decision')).to.eql('stable');\n  insomnia.expect(responseHeader('X-Release-Reason')).to.eql('forced');\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('upstream received stable track header', () => {\n  insomnia.expect(requestHeader(body.headers, 'X-Release-Track')).to.eql('stable');\n});",
+      "metaSortKey": -1778716799995,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_07_json_guard_valid_payload_is_proxied",
+      "parentId": "fld_json_guard",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/guarded/post",
+      "name": "JSON guard - valid payload is proxied",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"customer_id\":\"cust-123\",\"action\":\"signup\"}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json",
+          "id": "pair_1",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "function responseHeader(name) {\n  const wanted = name.toLowerCase();\n  const header = (insomnia.response.headers || []).find((candidate) => {\n    const key = candidate.key || candidate.name || '';\n    return key.toLowerCase() === wanted;\n  });\n  return header ? header.value : undefined;\n}\n\nfunction requestHeader(headers, name) {\n  const wanted = name.toLowerCase();\n  const key = Object.keys(headers || {}).find((candidate) => candidate.toLowerCase() === wanted);\n  return key ? headers[key] : undefined;\n}\n\ninsomnia.test('valid JSON is proxied', () => {\n  insomnia.expect(insomnia.response.status).to.eql(200);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('guard stripped /guarded and upstream received JSON', () => {\n  insomnia.expect(body.path).to.eql('/post');\n  insomnia.expect(body.json.customer_id).to.eql('cust-123');\n  insomnia.expect(body.json.action).to.eql('signup');\n});\n\ninsomnia.test('upstream received guard pass header', () => {\n  insomnia.expect(requestHeader(body.headers, 'X-Json-Guard')).to.eql('passed');\n});",
+      "metaSortKey": -1778716799994,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_08_json_guard_missing_required_field_is_rejected",
+      "parentId": "fld_json_guard",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/guarded/post",
+      "name": "JSON guard - missing required field is rejected",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"customer_id\":\"cust-123\"}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json",
+          "id": "pair_1",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('missing required field returns 422', () => {\n  insomnia.expect(insomnia.response.status).to.eql(422);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('response names the missing field', () => {\n  insomnia.expect(body.message).to.eql('Required JSON fields are missing');\n  insomnia.expect(body.missing).to.include('action');\n});",
+      "metaSortKey": -1778716799993,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_09_json_guard_forbidden_key_is_rejected",
+      "parentId": "fld_json_guard",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/guarded/post",
+      "name": "JSON guard - forbidden key is rejected",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"customer_id\":\"cust-123\",\"action\":\"signup\",\"password\":\"secret\"}"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json",
+          "id": "pair_1",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('forbidden key returns 422', () => {\n  insomnia.expect(insomnia.response.status).to.eql(422);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('response names the forbidden key', () => {\n  insomnia.expect(body.message).to.eql('Forbidden JSON fields are present');\n  insomnia.expect(body.forbidden).to.include('password');\n});",
+      "metaSortKey": -1778716799992,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    },
+    {
+      "_id": "req_10_json_guard_non_json_payload_is_rejected",
+      "parentId": "fld_json_guard",
+      "modified": 1778716800000,
+      "created": 1778716800000,
+      "url": "{{ _.proxy_url }}/guarded/post",
+      "name": "JSON guard - non-JSON payload is rejected",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "text/plain",
+        "text": "customer_id=cust-123&action=signup"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "text/plain",
+          "id": "pair_1",
+          "disabled": false
+        }
+      ],
+      "authentication": {},
+      "preRequestScript": "",
+      "afterResponseScript": "insomnia.test('non-JSON payload returns 415', () => {\n  insomnia.expect(insomnia.response.status).to.eql(415);\n});\n\nconst body = insomnia.response.json();\n\ninsomnia.test('response explains that JSON is required', () => {\n  insomnia.expect(body.message).to.eql('JSON payload required');\n});",
+      "metaSortKey": -1778716799991,
+      "isPrivate": false,
+      "pathParameters": [],
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "_type": "request"
+    }
+  ]
+}

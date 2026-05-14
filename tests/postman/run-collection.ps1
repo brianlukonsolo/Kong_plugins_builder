@@ -10,8 +10,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$postmanDir = Join-Path $repoRoot "postman"
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+$postmanDir = $PSScriptRoot
 $collection = Join-Path $postmanDir "Kong_3_4_2_Custom_Plugins.postman_collection.json"
 $environment = Join-Path $postmanDir "local.postman_environment.json"
 $rockDir = Join-Path $repoRoot "build/out"

@@ -30,7 +30,13 @@ docker compose up --build
 Run the automated Postman/Newman tests:
 
 ```powershell
-.\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1
+```
+
+Or, if you only want Bash and `curl`, start Kong and run:
+
+```sh
+bash tests/bash/run-curl-tests.sh
 ```
 
 Useful local URLs:
@@ -86,11 +92,10 @@ So keep these ideas separate:
 │   └── echo-server.py
 ├── kong/
 │   └── kong.yml
-├── postman/
-│   ├── Kong_3_4_2_Custom_Plugins.postman_collection.json
-│   ├── local.postman_environment.json
-│   ├── run-collection.ps1
-│   └── README.md
+├── tests/
+│   ├── postman/
+│   ├── insomnia/
+│   └── bash/
 ├── docker-compose.yml
 ├── Makefile
 └── README.md
@@ -104,7 +109,7 @@ What each folder means:
 | 🟡 `build/out/` | Generated `.rock` files land here after `make package` |
 | 🔵 `docker/` | Docker image files and helper scripts |
 | 🟣 `kong/kong.yml` | Kong DB-less config: services, routes, and enabled plugin instances |
-| 🟠 `postman/` | Automated smoke tests for the whole setup |
+| 🟠 `tests/` | Automated smoke tests in Postman, Insomnia, and Bash/curl formats |
 | ⚪ `src/` | Existing Maven archetype files; not used by the Kong runtime |
 
 ## 🔁 Full Flow
@@ -130,7 +135,7 @@ Kong loads plugins listed in KONG_PLUGINS
       ↓
 kong/kong.yml attaches plugin configs to routes/services/globally
       ↓
-Postman/Newman confirms everything works
+Smoke tests confirm everything works
 ```
 
 ## 📦 How Plugin Packaging Works
@@ -412,12 +417,12 @@ Useful for:
 - Sticky release-track decisions
 - Testing header-based routing logic
 
-## 🧪 Automated Postman Tests
+## 🧪 Automated Smoke Tests
 
-The easiest verification command is:
+The easiest verification command is still the Postman/Newman runner:
 
 ```powershell
-.\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1
 ```
 
 The script does this automatically:
@@ -439,11 +444,18 @@ Postman summary: requests=10/10, assertions=27/27, failures=0
 Useful options:
 
 ```powershell
-.\postman\run-collection.ps1 -SkipPackage
-.\postman\run-collection.ps1 -KeepRunning
-.\postman\run-collection.ps1 -UseDockerNewman
-.\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
+.\tests\postman\run-collection.ps1 -SkipPackage
+.\tests\postman\run-collection.ps1 -KeepRunning
+.\tests\postman\run-collection.ps1 -UseDockerNewman
+.\tests\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
 ```
+
+The same requests are also available without Postman:
+
+| Format | Location | How to use |
+| --- | --- | --- |
+| Insomnia | `tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json` | Import into Insomnia and run the collection |
+| Bash/curl | `tests/bash/run-curl-tests.sh` | Run `bash tests/bash/run-curl-tests.sh` after Kong is up |
 
 ## 🧭 Manual Checks
 
@@ -618,15 +630,17 @@ make package
 docker compose up --build
 ```
 
-### 6. Update Postman Tests
+### 6. Update Smoke Tests
 
 Edit:
 
 ```text
-postman/Kong_3_4_2_Custom_Plugins.postman_collection.json
+tests/postman/Kong_3_4_2_Custom_Plugins.postman_collection.json
+tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json
+tests/bash/run-curl-tests.sh
 ```
 
-Add tests that prove your work plugin actually works.
+Add or update tests that prove your work plugin actually works.
 
 Good tests usually check:
 
@@ -639,7 +653,7 @@ Good tests usually check:
 Then run:
 
 ```powershell
-.\postman\run-collection.ps1
+.\tests\postman\run-collection.ps1
 ```
 
 ## ✅ Work Plugin Replacement Checklist
@@ -654,7 +668,7 @@ Use this before sharing your work version:
 - 🟢 `docker-compose.yml` includes the plugin name in `KONG_PLUGINS`.
 - 🟢 `kong/kong.yml` configures the plugin where it should run.
 - 🟢 `docker compose up --build` starts successfully.
-- 🟢 Postman/Newman tests pass.
+- 🟢 Smoke tests pass.
 - 🔴 No secrets, tokens, private URLs, or customer data are committed.
 
 ## 🛠 Troubleshooting
@@ -745,7 +759,7 @@ The runtime is Docker-based, but packaging expects a Make-compatible shell.
 The runner can use Dockerized Newman:
 
 ```powershell
-.\postman\run-collection.ps1 -UseDockerNewman
+.\tests\postman\run-collection.ps1 -UseDockerNewman
 ```
 
 Or install Newman locally:
@@ -786,7 +800,7 @@ Makefile              = turns plugin source into .rock packages
 build/out/            = packaged plugin artifacts
 docker-compose.yml    = starts Kong and mounts the artifacts
 kong/kong.yml         = tells Kong where routes/services/plugins are
-postman/              = proves the setup works end to end
+tests/                = proves the setup works end to end
 ```
 
 For work, keep the machinery and swap the plugin content.
@@ -794,4 +808,4 @@ For work, keep the machinery and swap the plugin content.
 🟢 Same packaging pattern.  
 🟢 Same Docker install pattern.  
 🟢 Same DB-less Kong config pattern.  
-🟢 Different real plugins and different Postman assertions.
+🟢 Different real plugins and different smoke-test assertions.
