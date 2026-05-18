@@ -322,29 +322,34 @@ The Makefile discovers plugin directories with:
 PLUGIN_DIRS := $(wildcard custom-plugins/*)
 ```
 
-Then it checks each directory for a `.rockspec`:
+For each directory, the package target can now handle three cases:
 
-```sh
-if ls "$$plugin_dir"/*.rockspec >/dev/null 2>&1; then
-```
-
-So a folder is buildable when:
-
-```text
-custom-plugins/<folder>/*.rockspec
-```
-
-exists.
+| Case | Input Path |
+| --- | --- |
+| Build from source | `custom-plugins/<folder>/*.rockspec` |
+| Copy prebuilt rocks | `custom-plugins/<folder>/rocks/*.rock` or `custom-plugins/<folder>/dist/*.rock` |
+| Stage native libraries | `custom-plugins/<folder>/native/**/*.so*` |
 
 ### 4.3 Packaging loop
 
-The main packaging loop does this:
+The main packaging loop does this in simplified form:
 
 ```make
 for plugin_dir in $(PLUGIN_DIRS); do \
+  plugin_name=$$(basename "$$plugin_dir"); \
   if ls "$$plugin_dir"/*.rockspec >/dev/null 2>&1; then \
     (cd "$$plugin_dir" && . ../../.venv/env && pongo build --force && pongo pack); \
     mv "$$plugin_dir"/*.rock build/out/; \
+  fi; \
+  if ls "$$plugin_dir"/rocks/*.rock >/dev/null 2>&1; then \
+    cp "$$plugin_dir"/rocks/*.rock build/out/; \
+  fi; \
+  if ls "$$plugin_dir"/dist/*.rock >/dev/null 2>&1; then \
+    cp "$$plugin_dir"/dist/*.rock build/out/; \
+  fi; \
+  if [ -d "$$plugin_dir/native" ]; then \
+    mkdir -p "build/out/native/$$plugin_name"; \
+    cp -R "$$plugin_dir/native/." "build/out/native/$$plugin_name/"; \
   fi; \
 done
 ```
@@ -353,11 +358,14 @@ Step by step:
 
 1. Create `build/out`.
 2. Remove old `.rock` files from `build/out`.
-3. Enter each plugin directory.
-4. Source `.venv/env`.
-5. Run `pongo build --force`.
-6. Run `pongo pack`.
-7. Move generated `.rock` files into `build/out`.
+3. Remove old staged native files from `build/out/native`.
+4. For source plugins, enter each plugin directory.
+5. Source `.venv/env`.
+6. Run `pongo build --force`.
+7. Run `pongo pack`.
+8. Move generated `.rock` files into `build/out`.
+9. Copy prebuilt `.rock` files from `rocks/` or `dist/`.
+10. Stage native `.so` files under `build/out/native/<plugin>/`.
 
 Expected output:
 
@@ -480,6 +488,88 @@ Why install at startup?
 Because the `.rock` files are generated outside the image by `make package`, then mounted into the container. The startup script makes the runtime image generic: any `.rock` file placed in `build/out` gets installed.
 
 For production, you may prefer to bake plugins into a custom image at build time. This repo is optimized for local development and repeatable plugin testing.
+
+### 6.1 Native Lua FFI And C Library Support
+
+The runtime now supports proprietary plugins that load Linux shared libraries through LuaJIT FFI or Lua C modules.
+
+There are three supported artifact paths:
+
+| Artifact | Put It Here | What `make package` Does |
+| --- | --- | --- |
+| Source plugin with a rockspec | `custom-plugins/<plugin>/*.rockspec` | Builds and packs it with Pongo |
+| Prebuilt proprietary rock | `custom-plugins/<plugin>/rocks/*.rock` or `custom-plugins/<plugin>/dist/*.rock` | Copies it into `build/out/` |
+| Native shared libraries | `custom-plugins/<plugin>/native/**/*.so*` | Stages them under `build/out/native/<plugin>/` |
+
+At container startup, `docker/kong-install-rocks.sh` handles native libraries before installing rocks:
+
+```text
+/rocks/native/<plugin>/*.so*
+      |
+      v
+/usr/local/lib/kong-plugins/
+```
+
+The entrypoint then:
+
+1. Prepends `/usr/local/lib/kong-plugins` to `LD_LIBRARY_PATH`.
+2. Ensures `KONG_LUA_PACKAGE_CPATH` includes `/usr/local/lib/kong-plugins/?.so`, `/usr/local/lib/kong-plugins/lib?.so`, and the common LuaRocks C module paths under `/usr/local/lib/lua/5.1`.
+3. Writes `/usr/local/lib/kong-plugins` into `/etc/ld.so.conf.d/kong-plugins-native.conf` when the image supports `ldconfig`.
+4. Runs `ldconfig` when available.
+5. Installs every `.rock` from `/rocks`.
+
+Compose also preserves the native library path for Kong's Nginx worker processes:
+
+```yaml
+LD_LIBRARY_PATH: /usr/local/lib/kong-plugins
+KONG_LUA_PACKAGE_CPATH: "/usr/local/lib/kong-plugins/?.so;/usr/local/lib/kong-plugins/lib?.so;/usr/local/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/?/init.so;;"
+KONG_NGINX_MAIN_ENV: LD_LIBRARY_PATH
+KONG_NATIVE_LIB_DIR: /usr/local/lib/kong-plugins
+KONG_NATIVE_LIBS_SOURCE_DIR: /rocks/native
+KONG_REQUIRE_NATIVE_LIBS: "false"
+```
+
+FFI plugins can load a library by soname when the file is named with the standard `lib<name>.so` pattern:
+
+```lua
+local ffi = require "ffi"
+
+ffi.cdef [[
+  int my_native_function(const char *input);
+]]
+
+local native = ffi.load("my_work_plugin")
+```
+
+Lua C modules can be loaded with `require` when the module filename matches the Lua module name:
+
+```lua
+local native = require "my_native_module"
+```
+
+Native compatibility requirements:
+
+| Requirement | Why It Matters |
+| --- | --- |
+| Linux `.so` files only | Kong runs inside a Linux container |
+| Matching CPU architecture | An `amd64` container cannot load an `arm64` `.so`, and vice versa |
+| Compatible libc and linked dependencies | `ffi.load()` and Lua C `require()` ultimately use the container dynamic linker |
+| No unresolved dependent libraries | If `liba.so` depends on `libb.so`, both must be staged or installed in the image |
+
+If a proprietary rock compiles C during `docker compose build`, set:
+
+```sh
+INSTALL_NATIVE_BUILD_DEPS=true docker compose build kong
+```
+
+On PowerShell:
+
+```powershell
+$env:INSTALL_NATIVE_BUILD_DEPS = "true"
+docker compose build kong
+```
+
+This enables compiler/build packages in `docker/kong.Dockerfile`. Prefer prebuilt `.rock` and `.so` artifacts when you need repeatable local runs without compiling inside the Kong image.
 
 ## 7. Installed vs Enabled vs Configured
 

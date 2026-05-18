@@ -266,6 +266,77 @@ kong-plugin-my-plugin-0.1.0-1.rockspec
 
 If the filename and package do not match, LuaRocks will fail.
 
+## Native Lua FFI And C-Backed Plugins
+
+This project supports custom Kong plugins that load native Linux shared libraries through LuaJIT FFI or Lua C modules.
+
+Use this layout for proprietary native artifacts:
+
+```text
+custom-plugins/my-work-plugin/
+|-- kong-plugin-my-work-plugin-0.1.0-1.rockspec
+|-- kong/
+|   `-- plugins/
+|       `-- my-work-plugin/
+|           |-- handler.lua
+|           `-- schema.lua
+`-- native/
+    `-- libmy_work_plugin.so
+```
+
+`make package` stages `custom-plugins/<plugin>/native/**/*.so*` into:
+
+```text
+build/out/native/<plugin>/
+```
+
+When Kong starts, `docker/kong-install-rocks.sh` copies those Linux `.so` files into:
+
+```text
+/usr/local/lib/kong-plugins
+```
+
+The Compose runtime also sets:
+
+```yaml
+LD_LIBRARY_PATH: /usr/local/lib/kong-plugins
+KONG_LUA_PACKAGE_CPATH: "/usr/local/lib/kong-plugins/?.so;/usr/local/lib/kong-plugins/lib?.so;/usr/local/lib/lua/5.1/?.so;/usr/local/lib/lua/5.1/?/init.so;;"
+KONG_NGINX_MAIN_ENV: LD_LIBRARY_PATH
+```
+
+That gives two supported native loading patterns:
+
+```lua
+local ffi = require "ffi"
+ffi.cdef [[
+  int my_native_function(const char *input);
+]]
+
+local native = ffi.load("my_work_plugin")
+```
+
+and Lua C modules:
+
+```lua
+local native = require "my_native_module"
+```
+
+If your proprietary plugin is delivered as a prebuilt `.rock`, put it in either:
+
+```text
+custom-plugins/my-work-plugin/rocks/
+custom-plugins/my-work-plugin/dist/
+```
+
+The package target copies those rocks into `build/out/` without rebuilding them.
+
+Native compatibility rules:
+
+- Use Linux `.so` files, not Windows `.dll` or macOS `.dylib` files.
+- The `.so` architecture must match the Kong container architecture, for example `linux/amd64`.
+- Build against a libc compatible with the Kong image.
+- If the rock must compile C during `docker compose build`, set `INSTALL_NATIVE_BUILD_DEPS=true` before building.
+
 ## 🚀 How Kong Starts Locally
 
 Docker Compose starts two services:

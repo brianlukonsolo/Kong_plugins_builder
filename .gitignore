@@ -1,6 +1,8 @@
 target/
 .venv/
 *.rock
+custom-plugins/*/native/**/*.so
+custom-plugins/*/native/**/*.so.*
 custom-plugins/*/.pongo/
 custom-plugins/*/servroot/
 custom-plugins/*/logs/
