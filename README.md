@@ -7,7 +7,7 @@
 
 This repo is a local, containerized Kong plugin lab.
 
-In plain English: you put Lua Kong plugins into `custom-plugins/`, run `make package`, and the repo turns those plugins into LuaRocks `.rock` files. Then `docker compose up --build` starts Kong Gateway `3.4.2`, automatically installs those `.rock` files, loads the plugins, and exposes Kong locally.
+In plain English: you put Lua Kong plugins into `custom-plugins/`, run `docker compose run --rm plugin-packager`, and the repo turns those plugins into LuaRocks `.rock` files inside a Kong `3.4.2` container. Then `docker compose up --build` starts Kong Gateway `3.4.2`, automatically installs those `.rock` files, loads the plugins, and exposes Kong locally.
 
 The sample plugins are only examples. For work, you will replace them with your real plugins but keep the same packaging and runtime pattern.
 
@@ -18,7 +18,7 @@ For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_RE
 Package the plugins:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 ```
 
 Start Kong:
@@ -29,8 +29,14 @@ docker compose up --build
 
 Run the automated Postman/Newman tests:
 
-```powershell
-.\tests\postman\run-collection.ps1
+```sh
+docker compose run --rm newman
+```
+
+Or run the full package/start/test/stop flow through Maven:
+
+```sh
+mvn verify
 ```
 
 Or, if you only want Bash and `curl`, start Kong and run:
@@ -38,6 +44,14 @@ Or, if you only want Bash and `curl`, start Kong and run:
 ```sh
 bash tests/bash/run-curl-tests.sh
 ```
+
+Maven automation:
+
+| Command | What It Does |
+| --- | --- |
+| `mvn package` | Packages plugin rocks through `docker compose run --rm plugin-packager` |
+| `mvn verify` | Packages rocks, starts Kong, runs Compose Newman tests, then stops Compose |
+| `mvn -Ddocker.compose.skip=true verify` | Runs Maven without Docker Compose automation |
 
 Useful local URLs:
 
@@ -55,25 +69,25 @@ The repo has two separate jobs:
 
 | Job | Tool | What It Does |
 | --- | --- | --- |
-| 📦 Build plugins | `make package` + Pongo | Converts Lua plugin folders into `.rock` files |
+| 📦 Build plugins | `docker compose run --rm plugin-packager` | Converts Lua plugin folders into `.rock` files inside a Kong `3.4.2` container |
 | 🚀 Run Kong locally | Docker Compose | Starts Kong `3.4.2` and installs those `.rock` files |
 
 Important version note:
 
 ```make
 PONGO_VERSION := 2.12.0
-KONG_VERSION := 2.8.4.11
+KONG_VERSION := 3.4.2
 ```
 
-Those values are used by the Makefile/Pongo packaging flow because that is what was requested. The actual local Kong runtime is:
+Those values are used by the Makefile/Pongo packaging flow. The Docker Compose packaging flow and the actual local Kong runtime both use Kong `3.4.2`:
 
 ```yaml
 image: local/kong-plugins-builder:3.4.2
 ```
 
-So keep these ideas separate:
+So these versions are now aligned:
 
-- 🟨 `KONG_VERSION := 2.8.4.11` in the Makefile controls the Pongo build environment.
+- 🟨 `KONG_VERSION := 3.4.2` in the Makefile controls the Pongo build environment.
 - 🟦 `kong:3.4.2` in Docker controls the local Kong Gateway runtime.
 
 ## 📁 Repo Layout
@@ -106,7 +120,7 @@ What each folder means:
 | Path | Meaning |
 | --- | --- |
 | 🟢 `custom-plugins/` | The actual Lua Kong plugin source lives here |
-| 🟡 `build/out/` | Generated `.rock` files land here after `make package` |
+| 🟡 `build/out/` | Generated `.rock` files land here after packaging |
 | 🔵 `docker/` | Docker image files and helper scripts |
 | 🟣 `kong/kong.yml` | Kong DB-less config: services, routes, and enabled plugin instances |
 | 🟠 `tests/` | Automated smoke tests in Postman, Insomnia, and Bash/curl formats |
@@ -121,7 +135,7 @@ Lua plugin source
       ↓
 custom-plugins/<plugin-name>/
       ↓
-make package
+docker compose run --rm plugin-packager
       ↓
 build/out/*.rock
       ↓
@@ -154,16 +168,16 @@ custom-plugins/request-profiler/
             └── schema.lua
 ```
 
-The Makefile finds every folder under `custom-plugins/` that contains a `.rockspec` file:
+The Docker Compose packager finds every folder under `custom-plugins/` that contains a `.rockspec` file. The Makefile uses the same folder convention:
 
 ```make
 PLUGIN_DIRS := $(wildcard custom-plugins/*)
 ```
 
-Then this command packages them:
+Then this command packages them inside a Kong `3.4.2` container:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 ```
 
 That creates:
@@ -284,7 +298,7 @@ custom-plugins/my-work-plugin/
     `-- libmy_work_plugin.so
 ```
 
-`make package` stages `custom-plugins/<plugin>/native/**/*.so*` into:
+The packaging flow stages `custom-plugins/<plugin>/native/**/*.so*` into:
 
 ```text
 build/out/native/<plugin>/
@@ -498,11 +512,11 @@ The easiest verification command is still the Postman/Newman runner:
 
 The script does this automatically:
 
-1. 📦 Runs `make package` if `make` is installed.
+1. 📦 Runs `docker compose run --rm plugin-packager`.
 2. 🔎 Confirms `.rock` files exist in `build/out`.
 3. 🚀 Starts Docker Compose.
 4. ⏳ Waits for Kong to become ready.
-5. 🧪 Runs the Postman collection with Newman.
+5. 🧪 Runs the Postman collection with the Compose `newman` service.
 6. 📄 Writes results to `build/postman/newman-results.json`.
 7. 🧹 Stops Compose unless you pass `-KeepRunning`.
 
@@ -517,7 +531,6 @@ Useful options:
 ```powershell
 .\tests\postman\run-collection.ps1 -SkipPackage
 .\tests\postman\run-collection.ps1 -KeepRunning
-.\tests\postman\run-collection.ps1 -UseDockerNewman
 .\tests\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
 ```
 
@@ -697,7 +710,7 @@ Rule of thumb:
 ### 5. Package And Run
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 docker compose up --build
 ```
 
@@ -735,7 +748,7 @@ Use this before sharing your work version:
 - 🟢 Plugin has `handler.lua`.
 - 🟢 Plugin has `schema.lua`.
 - 🟢 Plugin has a matching `kong-plugin-<name>-<version>.rockspec`.
-- 🟢 `make package` creates a `.rock` file in `build/out`.
+- 🟢 `docker compose run --rm plugin-packager` creates a `.rock` file in `build/out`.
 - 🟢 `docker-compose.yml` includes the plugin name in `KONG_PLUGINS`.
 - 🟢 `kong/kong.yml` configures the plugin where it should run.
 - 🟢 `docker compose up --build` starts successfully.
@@ -755,7 +768,7 @@ build/out/ is empty
 Fix:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 docker compose up --build
 ```
 
@@ -823,14 +836,14 @@ Install one of these:
 - WSL
 - A dev container or Linux build agent
 
-The runtime is Docker-based, but packaging expects a Make-compatible shell.
+The legacy Makefile target expects a Make-compatible shell. The Docker Compose packager and `mvn package` do not require local `make`.
 
 ### 🟡 Newman is missing
 
-The runner can use Dockerized Newman:
+Newman now runs through Docker Compose:
 
 ```powershell
-.\tests\postman\run-collection.ps1 -UseDockerNewman
+docker compose run --rm newman
 ```
 
 Or install Newman locally:
@@ -857,8 +870,8 @@ Generated folders:
 
 | Folder | Safe To Delete? | Why |
 | --- | --- | --- |
-| `.venv/` | ✅ Yes | Recreated by `make package` |
-| `build/out/` | ✅ Yes | Recreated by `make package` |
+| `.venv/` | ✅ Yes | Recreated by the legacy Makefile/Pongo flow |
+| `build/out/` | ✅ Yes | Recreated by packaging |
 | `build/postman/` | ✅ Yes | Recreated by the Postman runner |
 
 ## 🧷 Final Mental Model

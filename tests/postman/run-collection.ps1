@@ -1,7 +1,6 @@
 param(
     [switch]$SkipPackage,
     [switch]$KeepRunning,
-    [switch]$UseDockerNewman,
     [int]$ProxyPort = 8000,
     [int]$ProxySslPort = 8443,
     [int]$AdminPort = 8001,
@@ -89,7 +88,7 @@ function Assert-PackagedRocks {
     $rocks = Get-ChildItem -Path $rockDir -Filter "*.rock" -ErrorAction SilentlyContinue
 
     if (-not $rocks) {
-        throw "No .rock files found in build/out. Run 'make package' first, or install make and rerun this script without -SkipPackage."
+        throw "No .rock files found in build/out. Run 'docker compose run --rm plugin-packager' first, or rerun this script without -SkipPackage."
     }
 
     Write-Host "----> Found $($rocks.Count) packaged rock file(s)"
@@ -125,51 +124,11 @@ function Invoke-Newman {
         [int]$Status
     )
 
-    $localProxyUrl = "http://localhost:$Proxy"
-    $localAdminUrl = "http://localhost:$Admin"
-    $localStatusUrl = "http://localhost:$Status"
-
     New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
     Remove-Item -LiteralPath $resultsFile -Force -ErrorAction SilentlyContinue
 
-    if (-not $UseDockerNewman -and (Get-Command newman -ErrorAction SilentlyContinue)) {
-        Write-Host "----> Running collection with local newman"
-        & newman run $collection -e $environment `
-            --env-var "proxy_url=$localProxyUrl" `
-            --env-var "admin_url=$localAdminUrl" `
-            --env-var "status_url=$localStatusUrl" `
-            --reporters cli,json `
-            --reporter-json-export $resultsFile `
-            --color on
-        return $LASTEXITCODE
-    }
-
-    if (-not $UseDockerNewman -and (Get-Command npx -ErrorAction SilentlyContinue)) {
-        Write-Host "----> Running collection with npx newman"
-        & npx --yes newman run $collection -e $environment `
-            --env-var "proxy_url=$localProxyUrl" `
-            --env-var "admin_url=$localAdminUrl" `
-            --env-var "status_url=$localStatusUrl" `
-            --reporters cli,json `
-            --reporter-json-export $resultsFile `
-            --color on
-        return $LASTEXITCODE
-    }
-
-    Write-Host "----> Running collection with Dockerized Newman"
-    & docker run --rm `
-        --add-host=host.docker.internal:host-gateway `
-        -v "${postmanDir}:/etc/newman:ro" `
-        -v "${resultsDir}:/etc/newman-results" `
-        postman/newman:alpine `
-        run /etc/newman/Kong_3_4_2_Custom_Plugins.postman_collection.json `
-        -e /etc/newman/local.postman_environment.json `
-        --env-var "proxy_url=http://host.docker.internal:$Proxy" `
-        --env-var "admin_url=http://host.docker.internal:$Admin" `
-        --env-var "status_url=http://host.docker.internal:$Status" `
-        --reporters cli,json `
-        --reporter-json-export /etc/newman-results/newman-results.json `
-        --color on
+    Write-Host "----> Running collection with docker compose newman"
+    & docker compose run --rm newman
 
     return $LASTEXITCODE
 }
@@ -212,11 +171,7 @@ try {
     Write-Host "----> Using ports: proxy=$resolvedProxyPort admin=$resolvedAdminPort status=$resolvedStatusPort"
 
     if (-not $SkipPackage) {
-        if (Get-Command make -ErrorAction SilentlyContinue) {
-            Invoke-CheckedCommand "Packaging plugin rocks with make package" { make package }
-        } else {
-            Write-Warning "make was not found. Reusing existing rocks from build/out."
-        }
+        Invoke-CheckedCommand "Packaging plugin rocks with docker compose" { docker compose run --rm plugin-packager }
     }
 
     Assert-PackagedRocks

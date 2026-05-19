@@ -9,7 +9,7 @@ This folder keeps the same Kong smoke-test coverage in three formats:
 Start Kong before using the Insomnia or Bash tests:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 docker compose up --build
 ```
 

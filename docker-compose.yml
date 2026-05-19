@@ -1,4 +1,16 @@
 services:
+  plugin-packager:
+    build:
+      context: .
+      dockerfile: docker/plugin-packager.Dockerfile
+      args:
+        INSTALL_NATIVE_BUILD_DEPS: "${INSTALL_NATIVE_BUILD_DEPS:-false}"
+    image: local/kong-plugin-packager:3.4.2
+    profiles:
+      - tools
+    volumes:
+      - .:/workspace
+
   echo:
     build:
       context: .
@@ -50,3 +62,31 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  newman:
+    image: postman/newman:alpine
+    profiles:
+      - tools
+    depends_on:
+      kong:
+        condition: service_healthy
+    volumes:
+      - ./tests/postman:/etc/newman:ro
+      - ./build/postman:/etc/newman-results
+    command:
+      - run
+      - /etc/newman/Kong_3_4_2_Custom_Plugins.postman_collection.json
+      - -e
+      - /etc/newman/local.postman_environment.json
+      - --env-var
+      - proxy_url=http://kong:8000
+      - --env-var
+      - admin_url=http://kong:8001
+      - --env-var
+      - status_url=http://kong:8100
+      - --reporters
+      - cli,json
+      - --reporter-json-export
+      - /etc/newman-results/newman-results.json
+      - --color
+      - "on"

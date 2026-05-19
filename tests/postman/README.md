@@ -19,22 +19,21 @@ From the repo root:
 
 The script:
 
-1. Runs `make package` when `make` is available.
+1. Runs `docker compose run --rm plugin-packager`.
 2. Confirms `.rock` files exist in `build/out`.
 3. Starts `docker compose up -d --build`.
 4. Auto-picks free host ports if the default Kong ports are already busy.
 5. Waits for the Kong status endpoint.
-6. Runs the Postman collection with Newman.
+6. Runs the Postman collection with the Compose `newman` service.
 7. Stops the Compose stack unless `-KeepRunning` is passed.
 
-If `newman` is not installed locally, the script falls back to the `postman/newman:alpine` Docker image.
+Newman runs in Docker through Compose, so local `newman` or `npx` is not required.
 
 ## Useful Options
 
 ```powershell
 .\tests\postman\run-collection.ps1 -SkipPackage
 .\tests\postman\run-collection.ps1 -KeepRunning
-.\tests\postman\run-collection.ps1 -UseDockerNewman
 .\tests\postman\run-collection.ps1 -ProxyPort 18000 -AdminPort 18001 -StatusPort 18100
 ```
 

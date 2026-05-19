@@ -1,6 +1,6 @@
 MDIR = ./
 PONGO_VERSION := 2.12.0
-KONG_VERSION := 2.8.4.11
+KONG_VERSION := 3.4.2
 
 PLUGIN_DIRS := $(wildcard custom-plugins/*)
 
@@ -10,7 +10,7 @@ build-venv:
 	@echo "----> DOWNLOADING PONGO..."
 	@git clone https://github.com/Kong/kong-pongo.git --depth 1 --branch $(PONGO_VERSION) .venv/pongo || true
 	@ln -sf $$(pwd)/.venv/pongo/pongo.sh $$(pwd)/.venv/bin/pongo
-	@echo "export PATH=$$(pwd)/.venv/bin:$$PATH" > .venv/env
+	@printf 'export PATH="%s/.venv/bin:$$PATH"\n' "$$(pwd)" > .venv/env
 	@echo "export KONG_VERSION=$(KONG_VERSION)" >> .venv/env
 	@echo "----> READY!"
 

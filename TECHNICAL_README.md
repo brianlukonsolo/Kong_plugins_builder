@@ -8,7 +8,7 @@ The short version:
 custom-plugins/<plugin>/        plugin source
 custom-plugins/<plugin>/*.rockspec
         |
-        | make package
+        | docker compose run --rm plugin-packager
         v
 build/out/*.rock                packaged LuaRocks artifacts
         |
@@ -35,10 +35,10 @@ The Makefile uses Pongo to build and pack the plugins:
 
 ```make
 PONGO_VERSION := 2.12.0
-KONG_VERSION := 2.8.4.11
+KONG_VERSION := 3.4.2
 ```
 
-These values are used by the `make package` workflow.
+These values are used by the legacy `make package` workflow.
 
 ### 1.2 Runtime Kong version
 
@@ -55,10 +55,10 @@ Important distinction:
 | Area | Version |
 | --- | --- |
 | Plugin packaging with Pongo | `PONGO_VERSION := 2.12.0` |
-| Pongo Kong build environment | `KONG_VERSION := 2.8.4.11` |
+| Pongo Kong build environment | `KONG_VERSION := 3.4.2` |
 | Local runtime gateway | `kong:3.4.2` |
 
-If your real work plugins use Kong APIs that changed between Kong versions, validate them against the runtime version, which is Kong `3.4.2`.
+The Pongo build environment and the local runtime are intentionally aligned to Kong `3.4.2`.
 
 ## 2. Plugin Source Layout
 
@@ -265,15 +265,23 @@ kong-plugin-my-plugin-0.1.0-1.rockspec
 
 If the filename does not match the `package` and `version`, LuaRocks will fail.
 
-## 4. Build Flow: `make package`
+## 4. Build Flow: Docker Compose Packager
 
-The packaging command is:
+The primary packaging command is:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 ```
 
-The Makefile has four main targets:
+This runs a short-lived Linux container based on Kong `3.4.2`. The container executes:
+
+```text
+docker/package-plugins.sh
+```
+
+That script uses LuaRocks from the Kong image to build each plugin into `build/out`.
+
+The Makefile remains available as a Pongo-based alternative and has four main targets:
 
 | Target | Purpose |
 | --- | --- |
@@ -309,7 +317,7 @@ The `.venv/env` file exports:
 
 ```sh
 PATH=<repo>/.venv/bin:$PATH
-KONG_VERSION=2.8.4.11
+KONG_VERSION=3.4.2
 ```
 
 Every plugin build sources this file before calling Pongo.
@@ -485,7 +493,7 @@ Behavior:
 
 Why install at startup?
 
-Because the `.rock` files are generated outside the image by `make package`, then mounted into the container. The startup script makes the runtime image generic: any `.rock` file placed in `build/out` gets installed.
+Because the `.rock` files are generated outside the runtime image by the Compose packager or `make package`, then mounted into the container. The startup script makes the runtime image generic: any `.rock` file placed in `build/out` gets installed.
 
 For production, you may prefer to bake plugins into a custom image at build time. This repo is optimized for local development and repeatable plugin testing.
 
@@ -495,9 +503,9 @@ The runtime now supports proprietary plugins that load Linux shared libraries th
 
 There are three supported artifact paths:
 
-| Artifact | Put It Here | What `make package` Does |
+| Artifact | Put It Here | What Packaging Does |
 | --- | --- | --- |
-| Source plugin with a rockspec | `custom-plugins/<plugin>/*.rockspec` | Builds and packs it with Pongo |
+| Source plugin with a rockspec | `custom-plugins/<plugin>/*.rockspec` | Builds and packs it with LuaRocks inside the Kong `3.4.2` packager container |
 | Prebuilt proprietary rock | `custom-plugins/<plugin>/rocks/*.rock` or `custom-plugins/<plugin>/dist/*.rock` | Copies it into `build/out/` |
 | Native shared libraries | `custom-plugins/<plugin>/native/**/*.so*` | Stages them under `build/out/native/<plugin>/` |
 
@@ -990,7 +998,7 @@ services:
 ### Step 6: Package
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 ```
 
 Confirm:
@@ -1066,7 +1074,7 @@ tests/postman/run-collection.ps1
 
 It performs:
 
-1. Optional packaging with `make package`.
+1. Optional packaging with `docker compose run --rm plugin-packager`.
 2. Rock existence check in `build/out`.
 3. Compose startup.
 4. Kong readiness polling.
@@ -1092,8 +1100,16 @@ Useful commands:
 .\tests\postman\run-collection.ps1
 .\tests\postman\run-collection.ps1 -SkipPackage
 .\tests\postman\run-collection.ps1 -KeepRunning
-.\tests\postman\run-collection.ps1 -UseDockerNewman
 ```
+
+Maven also drives the Compose workflow:
+
+```sh
+mvn package
+mvn verify
+```
+
+`mvn package` packages plugin rocks. `mvn verify` packages rocks, starts Kong, runs the Compose Newman smoke tests, and stops Compose.
 
 The script also detects busy default ports and chooses free alternatives for the run.
 
@@ -1152,8 +1168,8 @@ curl http://localhost:8001/plugins
 
 Run automated tests:
 
-```powershell
-.\tests\postman\run-collection.ps1 -UseDockerNewman
+```sh
+docker compose run --rm newman
 ```
 
 Or run the curl-based checks against an already-running stack:
@@ -1239,7 +1255,7 @@ Cause:
 Fix:
 
 ```sh
-make package
+docker compose run --rm plugin-packager
 docker compose up --build
 ```
 
@@ -1275,7 +1291,7 @@ The Postman runner handles this automatically.
 For work plugins, keep the loop tight:
 
 1. Edit `handler.lua`, `schema.lua`, or the rockspec.
-2. Run `make package`.
+2. Run `docker compose run --rm plugin-packager`.
 3. Run `docker compose up --build`.
 4. Watch logs:
 
@@ -1319,7 +1335,7 @@ Before calling a plugin ready, verify:
 - Plugin has `schema.lua`.
 - Rockspec filename matches `package` and `version`.
 - Rockspec `modules` paths match real files.
-- `make package` creates a `.rock` in `build/out`.
+- `docker compose run --rm plugin-packager` creates a `.rock` in `build/out`.
 - Compose mounts `build/out` into `/rocks`.
 - Startup logs show `luarocks install --force`.
 - Plugin name appears in `KONG_PLUGINS`.
