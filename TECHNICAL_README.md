@@ -989,23 +989,23 @@ Behavior:
 5. It extracts the configured SAML attributes, issues an encrypted JWE session cookie, and redirects back to the original URL.
 6. On later requests, it decrypts and authenticates the JWE, then sets configured upstream identity headers.
 
-## 10. Replacing The Example Plugins With Work Plugins
+## 10. Replacing The Example Plugins
 
 Use this exact sequence.
 
 ### Step 1: Add the plugin folder
 
 ```text
-custom-plugins/my-work-plugin/
+custom-plugins/my-plugin/
 ```
 
 ### Step 2: Add Kong plugin files
 
 ```text
-custom-plugins/my-work-plugin/
+custom-plugins/my-plugin/
 └── kong/
     └── plugins/
-        └── my-work-plugin/
+        └── my-plugin/
             ├── handler.lua
             └── schema.lua
 ```
@@ -1013,13 +1013,13 @@ custom-plugins/my-work-plugin/
 ### Step 3: Add the rockspec
 
 ```text
-custom-plugins/my-work-plugin/kong-plugin-my-work-plugin-0.1.0-1.rockspec
+custom-plugins/my-plugin/kong-plugin-my-plugin-0.1.0-1.rockspec
 ```
 
 Minimum rockspec:
 
 ```lua
-package = "kong-plugin-my-work-plugin"
+package = "kong-plugin-my-plugin"
 version = "0.1.0-1"
 
 source = {
@@ -1027,7 +1027,7 @@ source = {
 }
 
 description = {
-  summary = "My work Kong plugin.",
+  summary = "Example Kong plugin.",
   license = "Proprietary",
 }
 
@@ -1038,8 +1038,8 @@ dependencies = {
 build = {
   type = "builtin",
   modules = {
-    ["kong.plugins.my-work-plugin.handler"] = "kong/plugins/my-work-plugin/handler.lua",
-    ["kong.plugins.my-work-plugin.schema"] = "kong/plugins/my-work-plugin/schema.lua",
+    ["kong.plugins.my-plugin.handler"] = "kong/plugins/my-plugin/handler.lua",
+    ["kong.plugins.my-plugin.schema"] = "kong/plugins/my-plugin/schema.lua",
   },
 }
 ```
@@ -1049,7 +1049,7 @@ build = {
 In `docker-compose.yml`:
 
 ```yaml
-KONG_PLUGINS: bundled,my-work-plugin
+KONG_PLUGINS: bundled,my-plugin
 ```
 
 For multiple plugins:
@@ -1064,7 +1064,7 @@ Global:
 
 ```yaml
 plugins:
-  - name: my-work-plugin
+  - name: my-plugin
     config:
       some_setting: true
 ```
@@ -1076,11 +1076,11 @@ services:
   - name: local-echo
     url: http://echo:8080
     routes:
-      - name: work-route
+      - name: example-route
         paths:
-          - /work
+          - /example
         plugins:
-          - name: my-work-plugin
+          - name: my-plugin
             config:
               some_setting: true
 ```
@@ -1100,7 +1100,7 @@ ls build/out
 You should see:
 
 ```text
-kong-plugin-my-work-plugin-0.1.0-1.all.rock
+kong-plugin-my-plugin-0.1.0-1.all.rock
 ```
 
 ### Step 7: Verify install and load
@@ -1114,7 +1114,7 @@ curl http://localhost:8001/plugins/enabled
 Check plugin schema:
 
 ```sh
-curl http://localhost:8001/schemas/plugins/my-work-plugin
+curl http://localhost:8001/schemas/plugins/my-plugin
 ```
 
 Check container logs:
@@ -1126,8 +1126,8 @@ docker compose logs kong
 You should see lines like:
 
 ```text
-installing Kong plugin rock: /rocks/kong-plugin-my-work-plugin-0.1.0-1.all.rock
-kong-plugin-my-work-plugin 0.1.0-1 is now installed in /usr/local
+installing Kong plugin rock: /rocks/kong-plugin-my-plugin-0.1.0-1.all.rock
+kong-plugin-my-plugin 0.1.0-1 is now installed in /usr/local
 ```
 
 ### Step 8: Add smoke tests
@@ -1407,7 +1407,7 @@ The Postman runner handles this automatically.
 
 ## 14. Development Recommendations
 
-For work plugins, keep the loop tight:
+For custom plugins, keep the loop tight:
 
 1. Edit `handler.lua`, `schema.lua`, or the rockspec.
 2. Run `docker compose up --build --force-recreate`.

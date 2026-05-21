@@ -9,7 +9,7 @@ This repo is a local, containerized Kong plugin lab.
 
 Overview: put Lua Kong plugins into `custom-plugins/`, run `docker compose up --build`, and the repo builds those plugins into LuaRocks `.rock` files before Kong starts. Kong Gateway `3.4.2` then installs those `.rock` files, loads the enabled plugins, and exposes everything locally.
 
-The sample plugins are only examples. For work, you will replace them with your real plugins but keep the same packaging and runtime pattern.
+The sample plugins are only examples. For another project, you will replace them with your real plugins but keep the same packaging and runtime pattern.
 
 If you are copying this repo as a template, start with [`TEMPLATE_USAGE.md`](TEMPLATE_USAGE.md). For step-by-step testing, use [`TEST_RUNBOOK.md`](TEST_RUNBOOK.md). For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_README.md).
 
@@ -335,11 +335,11 @@ This project supports custom Kong plugins that load native Linux shared librarie
 Use this layout for proprietary native artifacts:
 
 ```text
-custom-plugins/my-work-plugin/
-|-- kong-plugin-my-work-plugin-0.1.0-1.rockspec
+custom-plugins/my-plugin/
+|-- kong-plugin-my-plugin-0.1.0-1.rockspec
 |-- kong/
 |   `-- plugins/
-|       `-- my-work-plugin/
+|       `-- my-plugin/
 |           |-- handler.lua
 |           `-- schema.lua
 `-- native/
@@ -386,8 +386,8 @@ local native = require "my_native_module"
 If your proprietary plugin is delivered as a prebuilt `.rock`, put it in either:
 
 ```text
-custom-plugins/my-work-plugin/rocks/
-custom-plugins/my-work-plugin/dist/
+custom-plugins/my-plugin/rocks/
+custom-plugins/my-plugin/dist/
 ```
 
 The package target copies those rocks into `build/out/` without rebuilding them.
@@ -729,26 +729,26 @@ curl -i -X POST http://localhost:8000/guarded/post \
   -d '{"customer_id":"cust-123","action":"signup","password":"secret"}'
 ```
 
-## 🏢 How To Replicate This For Work
+## 🏢 How To Reuse This Template
 
-Use this checklist when replacing the example plugins with work plugins.
+Use this checklist when replacing the example plugins with custom plugins.
 
 ### 1. Create A Plugin Folder
 
 Create:
 
 ```text
-custom-plugins/my-work-plugin/
+custom-plugins/my-plugin/
 ```
 
 Inside it, use this structure:
 
 ```text
-custom-plugins/my-work-plugin/
-├── kong-plugin-my-work-plugin-0.1.0-1.rockspec
+custom-plugins/my-plugin/
+├── kong-plugin-my-plugin-0.1.0-1.rockspec
 └── kong/
     └── plugins/
-        └── my-work-plugin/
+        └── my-plugin/
             ├── handler.lua
             └── schema.lua
 ```
@@ -756,9 +756,9 @@ custom-plugins/my-work-plugin/
 The folder name, Kong plugin name, and Lua module path should match:
 
 ```text
-my-work-plugin
-kong.plugins.my-work-plugin.handler
-kong.plugins.my-work-plugin.schema
+my-plugin
+kong.plugins.my-plugin.handler
+kong.plugins.my-plugin.schema
 ```
 
 ### 2. Update The Rockspec
@@ -766,7 +766,7 @@ kong.plugins.my-work-plugin.schema
 Use this pattern:
 
 ```lua
-package = "kong-plugin-my-work-plugin"
+package = "kong-plugin-my-plugin"
 version = "0.1.0-1"
 
 source = {
@@ -774,7 +774,7 @@ source = {
 }
 
 description = {
-  summary = "My work Kong plugin.",
+  summary = "Example Kong plugin.",
   license = "Proprietary",
 }
 
@@ -785,8 +785,8 @@ dependencies = {
 build = {
   type = "builtin",
   modules = {
-    ["kong.plugins.my-work-plugin.handler"] = "kong/plugins/my-work-plugin/handler.lua",
-    ["kong.plugins.my-work-plugin.schema"] = "kong/plugins/my-work-plugin/schema.lua",
+    ["kong.plugins.my-plugin.handler"] = "kong/plugins/my-plugin/handler.lua",
+    ["kong.plugins.my-plugin.schema"] = "kong/plugins/my-plugin/schema.lua",
   },
 }
 ```
@@ -802,7 +802,7 @@ KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,sam
 To something like:
 
 ```yaml
-KONG_PLUGINS: bundled,my-work-plugin
+KONG_PLUGINS: bundled,my-plugin
 ```
 
 Or, if you have several:
@@ -817,7 +817,7 @@ Global plugin example:
 
 ```yaml
 plugins:
-  - name: my-work-plugin
+  - name: my-plugin
     config:
       enabled_feature: true
 ```
@@ -833,7 +833,7 @@ services:
         paths:
           - /my-route
         plugins:
-          - name: my-work-plugin
+          - name: my-plugin
             config:
               enabled_feature: true
 ```
@@ -865,7 +865,7 @@ tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json
 tests/bash/run-curl-tests.sh
 ```
 
-Add or update tests that prove your work plugin actually works.
+Add or update tests that prove your custom plugin actually works.
 
 Good tests usually check:
 
@@ -881,9 +881,9 @@ Then run:
 .\tests\postman\run-collection.ps1
 ```
 
-## ✅ Work Plugin Replacement Checklist
+## ✅ Custom Plugin Checklist
 
-Use this before sharing your work version:
+Use this before sharing your custom plugin project:
 
 - 🟢 Plugin folder exists under `custom-plugins/`.
 - 🟢 Plugin has `handler.lua`.
@@ -932,7 +932,7 @@ ls build/out
 Add it to `KONG_PLUGINS` in `docker-compose.yml`:
 
 ```yaml
-KONG_PLUGINS: bundled,my-work-plugin
+KONG_PLUGINS: bundled,my-plugin
 ```
 
 ### 🔴 LuaRocks complains about the rockspec name
@@ -940,14 +940,14 @@ KONG_PLUGINS: bundled,my-work-plugin
 The rockspec filename must match:
 
 ```lua
-package = "kong-plugin-my-work-plugin"
+package = "kong-plugin-my-plugin"
 version = "0.1.0-1"
 ```
 
 Correct filename:
 
 ```text
-kong-plugin-my-work-plugin-0.1.0-1.rockspec
+kong-plugin-my-plugin-0.1.0-1.rockspec
 ```
 
 ### 🟡 Port `8000` is already in use
@@ -1027,7 +1027,7 @@ kong/kong.yml         = tells Kong where routes/services/plugins are
 tests/                = proves the setup works end to end
 ```
 
-For work, keep the machinery and swap the plugin content.
+For another project, keep the machinery and swap the plugin content.
 
 🟢 Same packaging pattern.  
 🟢 Same Docker install pattern.  
