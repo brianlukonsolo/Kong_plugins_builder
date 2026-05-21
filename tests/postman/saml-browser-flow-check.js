@@ -148,7 +148,35 @@ async function followKeycloak(location, limit = 5) {
   return response;
 }
 
+async function assertLargeMalformedAcsBodyIsParsed() {
+  const body = querystring.stringify({
+    SAMLResponse: "A".repeat(24000),
+    RelayState: "not-a-jwe",
+  });
+
+  const response = await request({
+    connectHost: "kong",
+    port: 8000,
+    hostHeader: "localhost:8000",
+    path: "/auth",
+    method: "POST",
+    jarName: "kong",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  if (response.status !== 400 || !response.body.includes("invalid RelayState")) {
+    throw new Error(`Expected large ACS form body to be parsed before validation, got ${response.status}: ${response.body.slice(0, 700)}`);
+  }
+
+  console.log("large_acs_form_body=400");
+}
+
 async function main() {
+  await assertLargeMalformedAcsBodyIsParsed();
+
   const first = await request({
     connectHost: "kong",
     port: 8000,

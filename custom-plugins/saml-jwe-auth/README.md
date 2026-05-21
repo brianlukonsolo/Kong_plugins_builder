@@ -144,6 +144,8 @@ http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor
 
 For local Compose, `kong/kong.yml` uses the internal metadata URL `http://keycloak:8080/realms/kong-plugin-lab/protocol/saml/descriptor`. You can also configure `idp_certificate_pem` directly if you want certificate pinning without metadata fetches.
 
+The complete working Keycloak/Kong SAML value table is in `keycloak/README.md` under "Complete SAML Configuration Reference".
+
 ## Build And Verify
 
 Package with Docker Compose:

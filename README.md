@@ -11,7 +11,7 @@ Overview: put Lua Kong plugins into `custom-plugins/`, run `docker compose up --
 
 The sample plugins are only examples. For work, you will replace them with your real plugins but keep the same packaging and runtime pattern.
 
-If you are copying this repo as a template, start with [`TEMPLATE_USAGE.md`](TEMPLATE_USAGE.md). For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_README.md).
+If you are copying this repo as a template, start with [`TEMPLATE_USAGE.md`](TEMPLATE_USAGE.md). For step-by-step testing, use [`TEST_RUNBOOK.md`](TEST_RUNBOOK.md). For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_README.md).
 
 ## 🟢 Quick Start
 
@@ -163,6 +163,7 @@ What each folder means:
 | ⚪ `src/` | Existing Maven archetype files; not used by the Kong runtime |
 | 🌈 `.env.example` | Optional local environment overrides for ports and credentials |
 | 🧩 `TEMPLATE_USAGE.md` | Copy-from-template checklist and plugin replacement guide |
+| 🧪 `TEST_RUNBOOK.md` | Step-by-step local verification runbook |
 
 ## 🔁 Full Flow
 
@@ -622,6 +623,8 @@ Keycloak details:
 | SAML client / SP entity ID | `kong-saml-auth-service` |
 | Test user | `alice` / `alice-password` |
 | Realm metadata | `http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor` |
+
+The full working SAML configuration is documented in [`keycloak/README.md`](keycloak/README.md), including every Keycloak realm/client attribute, mapper, test-user value, and matching Kong plugin setting.
 
 The SAML client is configured for both signed response documents and signed assertions:
 

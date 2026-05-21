@@ -50,6 +50,7 @@ int kong_saml_extract(const char *xml, size_t xml_len,
 
 local PLUGIN_NAME = "saml-jwe-auth"
 local REPLAY_DICT = "kong_saml_jwe_auth_replay"
+local MAX_ACS_FORM_BODY_BYTES = 5 * 1024 * 1024
 local JWE_HEADER = cjson.encode({
   alg = "dir",
   enc = "A256GCM",
@@ -661,12 +662,62 @@ local function cookie_header(conf, token)
 end
 
 
+local function read_request_body(max_bytes)
+  ngx.req.read_body()
+
+  local data = ngx.req.get_body_data()
+  if data then
+    if #data > max_bytes then
+      return nil, "request body too large"
+    end
+    return data
+  end
+
+  local body_file = ngx.req.get_body_file()
+  if not body_file then
+    return ""
+  end
+
+  local file, open_err = io.open(body_file, "rb")
+  if not file then
+    return nil, "could not open request body temp file: " .. tostring(open_err)
+  end
+
+  local size = file:seek("end")
+  if size and size > max_bytes then
+    file:close()
+    return nil, "request body too large"
+  end
+
+  file:seek("set")
+  local body = file:read("*a")
+  file:close()
+
+  return body or ""
+end
+
+
+local function read_form_body()
+  local raw_body, read_err = read_request_body(MAX_ACS_FORM_BODY_BYTES)
+  if not raw_body then
+    return nil, read_err
+  end
+
+  local args, decode_err = ngx.decode_args(raw_body, 100)
+  if not args then
+    return nil, "could not decode SAML POST form body: " .. tostring(decode_err)
+  end
+
+  return args
+end
+
+
 local function handle_acs(conf)
   if kong.request.get_method() ~= "POST" then
     return kong.response.exit(405, { message = "SAML ACS requires POST" })
   end
 
-  local body, body_err = kong.request.get_body()
+  local body, body_err = read_form_body()
   if not body then
     return kong.response.exit(400, { message = "could not read SAML POST body", detail = body_err })
   end

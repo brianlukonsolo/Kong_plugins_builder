@@ -43,6 +43,7 @@ docker compose up --build --force-recreate
 | `tests/postman/` | ✏️ Edit | Add smoke tests for your plugin behavior |
 | `docker/` | ✅ Usually keep | Build/install machinery |
 | `.env.example` | ✅ Copy to `.env` if needed | Local port/admin overrides |
+| `TEST_RUNBOOK.md` | 🧪 Use as-is | Step-by-step local verification |
 | `TECHNICAL_README.md` | 📚 Reference only | Deeper implementation notes |
 
 ## 🧱 Plugin Folder Shape
@@ -141,6 +142,8 @@ When copying this for a real SAML plugin, update:
 - `kong/kong.yml`
 - `custom-plugins/saml-jwe-auth/`
 - the Postman SAML tests
+
+The exact working local SAML values are listed in `keycloak/README.md` under "Complete SAML Configuration Reference".
 
 ## ✅ Copy Checklist
 
