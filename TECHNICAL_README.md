@@ -447,6 +447,51 @@ CMD ["kong", "docker-start"]
 
 The custom entrypoint runs first. After installing plugins, it calls the official Kong Docker entrypoint.
 
+### 5.3 Optional `keycloak` service
+
+The Keycloak service is optional and runs only when the `idp` profile is enabled:
+
+```sh
+docker compose --profile idp up -d keycloak
+```
+
+It uses:
+
+```yaml
+image: quay.io/keycloak/keycloak:26.4.0
+command:
+  - start-dev
+  - --import-realm
+```
+
+The realm import file is:
+
+```text
+keycloak/realm-export.json
+```
+
+It imports:
+
+| Item | Value |
+| --- | --- |
+| Realm | `kong-plugin-lab` |
+| SAML client / SP entity ID | `kong-saml-auth-service` |
+| Admin console | `http://localhost:18080/admin` |
+| Realm metadata | `http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor` |
+
+The SAML client is configured to sign both the SAML Response document and the embedded Assertion:
+
+| Setting | Attribute | Value |
+| --- | --- | --- |
+| Sign SAML Response document | `saml.server.signature` | `true` |
+| Sign SAML Assertion | `saml.assertion.signature` | `true` |
+| Signature algorithm | `saml.signature.algorithm` | `RSA_SHA256` |
+| One-time-use condition | `saml.onetimeuse.condition` | `true` |
+
+This is intentionally decoupled from Kong plugin logic. Keycloak is only the IdP. A separate SAML SP/auth service should receive and validate SAML responses, then issue a short-lived internal JWT or session that a Kong guard plugin can enforce.
+
+The repo does not validate SAML XML inside Lua. That is deliberate. SAML validation requires XML canonicalization, signed-reference validation, replay protection, and XML signature wrapping defenses that should live in a dedicated auth service with a mature SAML library.
+
 ## 6. How Rocks Are Installed Into Kong
 
 At runtime, Compose mounts the packaged rocks:
@@ -1112,6 +1157,30 @@ mvn verify
 `mvn package` packages plugin rocks. `mvn verify` packages rocks, starts Kong, runs the Compose Newman smoke tests, and stops Compose.
 
 The script also detects busy default ports and chooses free alternatives for the run.
+
+The Keycloak SAML runner is:
+
+```text
+tests/postman/run-keycloak-saml-collection.ps1
+```
+
+It starts the optional `keycloak` service with the `idp` profile, waits for SAML metadata, and runs:
+
+```text
+tests/postman/Keycloak_SAML_IdP.postman_collection.json
+```
+
+Results file:
+
+```text
+build/postman/keycloak-saml-newman-results.json
+```
+
+Expected pass summary:
+
+```text
+Keycloak SAML summary: requests=11/11, assertions=26/26, failures=0
+```
 
 The same request coverage is available without Postman:
 

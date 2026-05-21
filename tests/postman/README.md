@@ -1,6 +1,15 @@
 # Postman Smoke Tests
 
-The collection validates the local Kong 3.4.2 setup end to end:
+This folder has two Postman/Newman suites:
+
+| Collection | Runner | Purpose |
+| --- | --- | --- |
+| `Kong_3_4_2_Custom_Plugins.postman_collection.json` | `run-collection.ps1` | Validates Kong, the custom plugins, and the local echo upstream |
+| `Keycloak_SAML_IdP.postman_collection.json` | `run-keycloak-saml-collection.ps1` | Validates the optional Keycloak SAML IdP realm, SAML endpoints, and signing config |
+
+## Kong Plugin Collection
+
+The Kong collection validates the local Kong 3.4.2 setup end to end:
 
 - Kong status and Admin API are reachable.
 - Kong reports version `3.4.2`.
@@ -45,3 +54,50 @@ Import both files:
 - `local.postman_environment.json`
 
 Then select the `Kong 3.4.2 Local` environment and run the collection.
+
+## Keycloak SAML Collection
+
+From the repo root:
+
+```powershell
+.\tests\postman\run-keycloak-saml-collection.ps1
+```
+
+The script:
+
+1. Starts `keycloak` with `docker compose --profile idp up -d keycloak`.
+2. Waits for the realm SAML metadata endpoint.
+3. Runs `Keycloak_SAML_IdP.postman_collection.json` with the Compose `newman` service.
+4. Writes results to `build/postman/keycloak-saml-newman-results.json`.
+5. Stops Keycloak unless it was already running or `-KeepRunning` is passed.
+
+Useful options:
+
+```powershell
+.\tests\postman\run-keycloak-saml-collection.ps1 -KeepRunning
+.\tests\postman\run-keycloak-saml-collection.ps1 -KeycloakPort 18080
+.\tests\postman\run-keycloak-saml-collection.ps1 -AdminUsername admin -AdminPassword admin
+```
+
+The Keycloak collection checks:
+
+- SAML metadata descriptor is published.
+- Signing certificate appears in metadata.
+- HTTP-POST, HTTP-Redirect, SOAP, SSO, SLO, and artifact endpoints appear in metadata.
+- IdP-initiated SSO login page is reachable.
+- Empty or malformed SAML protocol requests are rejected.
+- The imported SAML client has signed Response and signed Assertion enabled.
+- `RSA_SHA256`, one-time-use condition, ACS URL, logout URL, and SAML attribute mappers are configured.
+
+For manual Postman use, import:
+
+- `Keycloak_SAML_IdP.postman_collection.json`
+- `keycloak.postman_environment.json`
+
+Then start Keycloak with:
+
+```powershell
+docker compose --profile idp up -d keycloak
+```
+
+Select the `Keycloak SAML Local` environment and run the collection.

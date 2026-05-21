@@ -53,6 +53,16 @@ Maven automation:
 | `mvn verify` | Packages rocks, starts Kong, runs Compose Newman tests, then stops Compose |
 | `mvn -Ddocker.compose.skip=true verify` | Runs Maven without Docker Compose automation |
 
+Optional local Keycloak SAML IdP:
+
+```sh
+docker compose --profile idp up -d keycloak
+```
+
+Plain `docker compose up --build` does not start Keycloak because the service is behind the optional `idp` profile.
+
+Keycloak runs at `http://localhost:18080` and imports the `kong-plugin-lab` realm from `keycloak/realm-export.json`.
+
 Useful local URLs:
 
 | Purpose | URL |
@@ -122,6 +132,7 @@ What each folder means:
 | 🟢 `custom-plugins/` | The actual Lua Kong plugin source lives here |
 | 🟡 `build/out/` | Generated `.rock` files land here after packaging |
 | 🔵 `docker/` | Docker image files and helper scripts |
+| 🔐 `keycloak/` | Optional local Keycloak realm export for SAML IdP testing |
 | 🟣 `kong/kong.yml` | Kong DB-less config: services, routes, and enabled plugin instances |
 | 🟠 `tests/` | Automated smoke tests in Postman, Insomnia, and Bash/curl formats |
 | ⚪ `src/` | Existing Maven archetype files; not used by the Kong runtime |
@@ -540,6 +551,59 @@ The same requests are also available without Postman:
 | --- | --- | --- |
 | Insomnia | `tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json` | Import into Insomnia and run the collection |
 | Bash/curl | `tests/bash/run-curl-tests.sh` | Run `bash tests/bash/run-curl-tests.sh` after Kong is up |
+
+## 🔐 Optional Keycloak SAML IdP
+
+This repo includes an optional Keycloak service for local SAML IdP testing. It is deliberately separate from the Kong plugins.
+
+```sh
+docker compose --profile idp up -d keycloak
+```
+
+Plain `docker compose up --build` starts the default Kong lab services only. It does not start Keycloak unless you include `--profile idp`.
+
+Keycloak details:
+
+| Item | Value |
+| --- | --- |
+| Admin console | `http://localhost:18080/admin` |
+| Local admin username | `admin` |
+| Local admin password | `admin` |
+| Realm | `kong-plugin-lab` |
+| SAML client / SP entity ID | `kong-saml-auth-service` |
+| Test user | `alice` / `alice-password` |
+| Realm metadata | `http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor` |
+
+The SAML client is configured for both signed response documents and signed assertions:
+
+| Security Setting | Realm Export Attribute | Value |
+| --- | --- | --- |
+| Signed SAML Response | `saml.server.signature` | `true` |
+| Signed SAML Assertion | `saml.assertion.signature` | `true` |
+| Signature algorithm | `saml.signature.algorithm` | `RSA_SHA256` |
+| One-time-use condition | `saml.onetimeuse.condition` | `true` |
+
+The intended decoupled flow is:
+
+```text
+Keycloak IdP
+      ↓ SAMLResponse
+SAML auth service / SP
+      ↓ short-lived internal token or session
+Kong guard plugin
+      ↓ trusted identity headers
+upstream API
+```
+
+Do not validate SAML XML signatures inside a Kong Lua plugin. Keep that in a dedicated auth service that uses a mature SAML library and validates signed response, signed assertion, issuer, audience, destination, recipient, timestamps, replay protection, and XML signature wrapping defenses.
+
+See `keycloak/README.md` for the exact imported realm settings and reset commands.
+
+Run the Keycloak SAML Postman/Newman checks with:
+
+```powershell
+.\tests\postman\run-keycloak-saml-collection.ps1
+```
 
 ## 🧭 Manual Checks
 

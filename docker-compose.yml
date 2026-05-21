@@ -18,6 +18,33 @@ services:
     image: local/kong-plugins-echo:latest
     container_name: kong-plugins-echo
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    container_name: kong-plugins-keycloak
+    profiles:
+      - idp
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname-strict=false
+      - --http-enabled=true
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: "${KEYCLOAK_ADMIN:-admin}"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:-admin}"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "${KEYCLOAK_PORT:-18080}:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/kong-plugin-lab-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /realms/kong-plugin-lab HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; grep -q \"200 OK\" <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   kong:
     build:
       context: .

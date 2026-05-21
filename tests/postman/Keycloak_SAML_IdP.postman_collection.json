@@ -1,0 +1,418 @@
+{
+  "info": {
+    "_postman_id": "78aebf16-1695-4693-bac6-cd9ac33dc749",
+    "name": "Keycloak SAML IdP",
+    "description": "Smoke tests for the local Keycloak SAML IdP realm and SAML client configuration.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "SAML - metadata descriptor is published",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml/descriptor"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"metadata endpoint returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.text();",
+              "",
+              "pm.test(\"metadata is SAML XML\", function () {",
+              "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/xml\");",
+              "  pm.expect(body).to.include(\"EntityDescriptor\");",
+              "  pm.expect(body).to.include(\"IDPSSODescriptor\");",
+              "  pm.expect(body).to.include(\"/realms/\" + pm.environment.get(\"realm\"));",
+              "});",
+              "",
+              "pm.test(\"metadata exposes signing certificate\", function () {",
+              "  pm.expect(body).to.include(\"KeyDescriptor use=\\\"signing\\\"\");",
+              "  pm.expect(body).to.include(\"X509Certificate\");",
+              "});",
+              "",
+              "pm.test(\"metadata exposes SSO, SLO, and artifact endpoints\", function () {",
+              "  pm.expect(body).to.include(\"SingleSignOnService\");",
+              "  pm.expect(body).to.include(\"SingleLogoutService\");",
+              "  pm.expect(body).to.include(\"ArtifactResolutionService\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - metadata exposes POST and Redirect bindings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml/descriptor"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"metadata endpoint returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.text();",
+              "",
+              "pm.test(\"HTTP-POST binding is advertised\", function () {",
+              "  pm.expect(body).to.include(\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\");",
+              "});",
+              "",
+              "pm.test(\"HTTP-Redirect binding is advertised\", function () {",
+              "  pm.expect(body).to.include(\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect\");",
+              "});",
+              "",
+              "pm.test(\"SOAP binding is advertised for artifact resolution\", function () {",
+              "  pm.expect(body).to.include(\"urn:oasis:names:tc:SAML:2.0:bindings:SOAP\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - IdP initiated SSO page is reachable",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml/clients/{{saml_client_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"IdP initiated SSO returns login page\", function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\");",
+              "  pm.expect(pm.response.text()).to.include(\"login-pf\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - protocol endpoint rejects empty request",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"empty SAML protocol request is rejected\", function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - protocol endpoint rejects malformed SAMLRequest",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml?SAMLRequest=invalid"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"malformed SAMLRequest is rejected\", function () {",
+              "  pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - protocol endpoint rejects malformed SAMLResponse",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "SAMLResponse",
+              "value": "invalid",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"malformed SAMLResponse is rejected\", function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([400, 500]);",
+              "});",
+              "",
+              "pm.test(\"malformed SAMLResponse does not authenticate\", function () {",
+              "  pm.expect(pm.response.code).to.not.be.oneOf([200, 201, 204, 302]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML - artifact resolution rejects malformed SOAP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "text/xml"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"><soapenv:Body /></soapenv:Envelope>"
+        },
+        "url": "{{keycloak_url}}/realms/{{realm}}/protocol/saml/resolve"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"malformed artifact resolution SOAP is rejected\", function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([400, 404, 500]);",
+              "});",
+              "",
+              "pm.test(\"artifact resolution does not authenticate malformed input\", function () {",
+              "  pm.expect(pm.response.code).to.not.be.oneOf([200, 201, 204, 302]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - obtain access token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "client_id",
+              "value": "admin-cli",
+              "type": "text"
+            },
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "{{admin_username}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{admin_password}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": "{{keycloak_url}}/realms/master/protocol/openid-connect/token"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"admin token request returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const body = pm.response.json();",
+              "",
+              "pm.test(\"admin token is present\", function () {",
+              "  pm.expect(body.access_token).to.be.a(\"string\").and.not.empty;",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"admin_token\", body.access_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - SAML client signing config is imported",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": "{{keycloak_url}}/admin/realms/{{realm}}/clients?clientId={{saml_client_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"client lookup returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const clients = pm.response.json();",
+              "const client = clients[0] || {};",
+              "const attrs = client.attributes || {};",
+              "",
+              "pm.test(\"SAML client exists\", function () {",
+              "  pm.expect(clients).to.have.lengthOf(1);",
+              "  pm.expect(client.clientId).to.eql(pm.environment.get(\"saml_client_id\"));",
+              "  pm.expect(client.protocol).to.eql(\"saml\");",
+              "});",
+              "",
+              "pm.test(\"Response and Assertion signing are enabled\", function () {",
+              "  pm.expect(attrs[\"saml.server.signature\"]).to.eql(\"true\");",
+              "  pm.expect(attrs[\"saml.assertion.signature\"]).to.eql(\"true\");",
+              "});",
+              "",
+              "pm.test(\"SAML security settings are strict enough for local testing\", function () {",
+              "  pm.expect(attrs[\"saml.signature.algorithm\"]).to.eql(\"RSA_SHA256\");",
+              "  pm.expect(attrs[\"saml.force.post.binding\"]).to.eql(\"true\");",
+              "  pm.expect(attrs[\"saml.onetimeuse.condition\"]).to.eql(\"true\");",
+              "});",
+              "",
+              "pm.test(\"ACS and logout URLs are configured\", function () {",
+              "  pm.expect(attrs[\"saml_assertion_consumer_url_post\"]).to.eql(\"http://localhost:8000/saml/acs\");",
+              "  pm.expect(attrs[\"saml_single_logout_service_url_post\"]).to.eql(\"http://localhost:8000/saml/sls\");",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"client_uuid\", client.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - SAML attribute mappers are imported",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": "{{keycloak_url}}/admin/realms/{{realm}}/clients/{{client_uuid}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"client detail returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const client = pm.response.json();",
+              "const mapperNames = (client.protocolMappers || []).map(function (mapper) { return mapper.name; });",
+              "",
+              "pm.test(\"expected SAML mappers are present\", function () {",
+              "  [\"email\", \"given_name\", \"family_name\", \"groups\"].forEach(function (name) {",
+              "    pm.expect(mapperNames).to.include(name);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - local SAML test user exists",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": "{{keycloak_url}}/admin/realms/{{realm}}/users?username=alice&exact=true"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"user lookup returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const users = pm.response.json();",
+              "",
+              "pm.test(\"alice test user exists\", function () {",
+              "  pm.expect(users).to.have.lengthOf(1);",
+              "  pm.expect(users[0].username).to.eql(\"alice\");",
+              "  pm.expect(users[0].email).to.eql(\"alice@example.test\");",
+              "  pm.expect(users[0].enabled).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "client_uuid",
+      "value": ""
+    }
+  ]
+}

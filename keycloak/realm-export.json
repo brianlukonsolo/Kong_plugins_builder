@@ -1,0 +1,133 @@
+{
+  "realm": "kong-plugin-lab",
+  "displayName": "Kong Plugin Lab",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "clients": [
+    {
+      "clientId": "kong-saml-auth-service",
+      "name": "Kong SAML Auth Service",
+      "description": "Local SAML SP placeholder for a decoupled auth service in front of Kong APIs.",
+      "enabled": true,
+      "protocol": "saml",
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "redirectUris": [
+        "http://localhost:8000/saml/acs",
+        "http://localhost:8082/saml/acs"
+      ],
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.authnstatement": "true",
+        "saml.client.signature": "false",
+        "saml.encrypt": "false",
+        "saml.force.post.binding": "true",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": "username",
+        "saml.onetimeuse.condition": "true",
+        "saml.server.signature": "true",
+        "saml.server.signature.keyinfo.ext": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#",
+        "saml_single_logout_service_url_post": "http://localhost:8000/saml/sls",
+        "saml_single_logout_service_url_redirect": "http://localhost:8000/saml/sls",
+        "saml_assertion_consumer_url_post": "http://localhost:8000/saml/acs",
+        "saml_assertion_consumer_url_redirect": "http://localhost:8000/saml/acs",
+        "saml_idp_initiated_sso_url_name": "kong-saml-auth-service",
+        "saml_idp_initiated_sso_relay_state": ""
+      },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.name": "email",
+            "attribute.nameformat": "Basic",
+            "friendly.name": "email",
+            "user.attribute": "email"
+          }
+        },
+        {
+          "name": "given_name",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.name": "given_name",
+            "attribute.nameformat": "Basic",
+            "friendly.name": "given_name",
+            "user.attribute": "firstName"
+          }
+        },
+        {
+          "name": "family_name",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.name": "family_name",
+            "attribute.nameformat": "Basic",
+            "friendly.name": "family_name",
+            "user.attribute": "lastName"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "saml",
+          "protocolMapper": "saml-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "attribute.name": "groups",
+            "attribute.nameformat": "Basic",
+            "full.path": "false",
+            "single": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "engineering",
+      "path": "/engineering"
+    },
+    {
+      "name": "api-admins",
+      "path": "/api-admins"
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Example",
+      "email": "alice@example.test",
+      "groups": [
+        "/engineering",
+        "/api-admins"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}
