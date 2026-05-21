@@ -76,7 +76,7 @@
               "",
               "const enabled = JSON.stringify(pm.response.json());",
               "",
-              "[\"request-profiler\", \"json-field-guard\", \"canary-header-router\"].forEach(function (plugin) {",
+              "[\"request-profiler\", \"json-field-guard\", \"canary-header-router\", \"saml-jwe-auth\"].forEach(function (plugin) {",
               "  pm.test(plugin + \" is enabled\", function () {",
               "    pm.expect(enabled).to.include(plugin);",
               "  });",
@@ -404,6 +404,38 @@
               "",
               "pm.test(\"response explains that JSON is required\", function () {",
               "  pm.expect(pm.response.json().message).to.eql(\"JSON payload required\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "SAML JWE auth - protected route starts SAML login",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{proxy_url}}/saml-demo"
+      },
+      "protocolProfileBehavior": {
+        "followRedirects": false
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"protected route redirects to Keycloak\", function () {",
+              "  pm.response.to.have.status(302);",
+              "  pm.expect(pm.response.headers.get(\"Location\")).to.include(\"http://localhost:18080/realms/kong-plugin-lab/protocol/saml\");",
+              "});",
+              "",
+              "const location = pm.response.headers.get(\"Location\") || \"\";",
+              "",
+              "pm.test(\"redirect includes SAMLRequest and RelayState\", function () {",
+              "  pm.expect(location).to.include(\"SAMLRequest=\");",
+              "  pm.expect(location).to.include(\"RelayState=\");",
               "});"
             ],
             "type": "text/javascript"

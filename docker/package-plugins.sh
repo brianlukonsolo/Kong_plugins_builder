@@ -20,6 +20,11 @@ for plugin_dir in "$PLUGIN_DIR"/*; do
 
   plugin_name="$(basename "$plugin_dir")"
 
+  if [ -f "$plugin_dir/native/Makefile" ]; then
+    echo "----> BUILDING NATIVE LIBRARIES FOR $plugin_name"
+    make -C "$plugin_dir/native" clean all
+  fi
+
   for rockspec in "$plugin_dir"/*.rockspec; do
     [ -e "$rockspec" ] || continue
 

@@ -2,13 +2,17 @@ _format_version: "3.0"
 _transform: true
 
 services:
+  # 🧪 Template sample service.
+  # Replace or copy this block when your plugin should protect/modify a real upstream.
   - name: local-echo
     url: http://echo:8080
     routes:
+      # Open sample route used by smoke tests.
       - name: anything
         paths:
           - /anything
         strip_path: false
+      # Route-level plugin example: json-field-guard only runs on this route.
       - name: guarded-json
         paths:
           - /guarded
@@ -34,8 +38,55 @@ services:
               max_payload_bytes: 32768
               require_json: true
               upstream_status_header: X-Json-Guard
+  # 🔐 SAML/JWE demo service.
+  # Keep this as a working reference when copying the template for SSO plugins.
+  - name: saml-demo-echo
+    url: http://echo:8080
+    routes:
+      # Browser-protected demo route.
+      - name: saml-demo
+        paths:
+          - /saml-demo
+        strip_path: false
+      # Assertion Consumer Service callback. The IdP posts SAMLResponse here.
+      - name: saml-auth-callback
+        paths:
+          - /auth
+        strip_path: false
+    plugins:
+      - name: saml-jwe-auth
+        config:
+          acs_path: /auth
+          idp_sso_url: http://localhost:18080/realms/kong-plugin-lab/protocol/saml
+          idp_metadata_url: http://keycloak:8080/realms/kong-plugin-lab/protocol/saml/descriptor
+          idp_entity_id: http://localhost:18080/realms/kong-plugin-lab
+          sp_entity_id: kong-saml-auth-service
+          assertion_consumer_service_url: http://localhost:8000/auth
+          jwe_key: local-dev-saml-jwe-key-change-me-32-bytes
+          session_cookie_name: kong_saml_session
+          session_cookie_secure: false
+          session_cookie_same_site: Lax
+          session_ttl_seconds: 3600
+          relay_state_ttl_seconds: 300
+          clock_skew_seconds: 120
+          require_replay_protection: true
+          attribute_mappings:
+            # Map SAML attributes into JWE claims and upstream headers.
+            - claim: email
+              saml_attribute: email
+              upstream_header: X-Authenticated-Email
+            - claim: given_name
+              saml_attribute: given_name
+              upstream_header: X-Authenticated-Given-Name
+            - claim: family_name
+              saml_attribute: family_name
+              upstream_header: X-Authenticated-Family-Name
+            - claim: groups
+              saml_attribute: groups
+              upstream_header: X-Authenticated-Groups
 
 plugins:
+  # 🌍 Global plugin examples. These run on every matching proxied request.
   - name: request-profiler
     config:
       request_header: X-Request-Id

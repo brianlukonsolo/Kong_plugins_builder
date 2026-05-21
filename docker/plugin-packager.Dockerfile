@@ -8,7 +8,14 @@ RUN set -eux; \
     if command -v apt-get >/dev/null 2>&1; then \
       apt-get update; \
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        build-essential \
         ca-certificates \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        libxmlsec1-openssl \
+        pkg-config \
+        zlib1g-dev \
         zip; \
       if [ "$INSTALL_NATIVE_BUILD_DEPS" = "true" ]; then \
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -18,7 +25,13 @@ RUN set -eux; \
       rm -rf /var/lib/apt/lists/*; \
     elif command -v apk >/dev/null 2>&1; then \
       apk add --no-cache \
+        build-base \
         ca-certificates \
+        libxml2-dev \
+        openssl-dev \
+        pkgconf \
+        xmlsec-dev \
+        zlib-dev \
         zip; \
       if [ "$INSTALL_NATIVE_BUILD_DEPS" = "true" ]; then \
         apk add --no-cache \
@@ -29,6 +42,15 @@ RUN set -eux; \
     elif command -v microdnf >/dev/null 2>&1; then \
       microdnf install -y \
         ca-certificates \
+        gcc \
+        gcc-c++ \
+        libxml2-devel \
+        make \
+        openssl-devel \
+        pkgconf-pkg-config \
+        xmlsec1-devel \
+        xmlsec1-openssl-devel \
+        zlib-devel \
         zip; \
       if [ "$INSTALL_NATIVE_BUILD_DEPS" = "true" ]; then \
         microdnf install -y \

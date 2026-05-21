@@ -8,11 +8,14 @@ The short version:
 custom-plugins/<plugin>/        plugin source
 custom-plugins/<plugin>/*.rockspec
         |
-        | docker compose run --rm plugin-packager
+        | docker compose up --build
+        v
+plugin-packager service          one-shot packaging job
+        |
         v
 build/out/*.rock                packaged LuaRocks artifacts
         |
-        | docker compose up --build
+        | Kong depends on successful packaging
         v
 Kong 3.4.2 container startup
         |
@@ -267,19 +270,19 @@ If the filename does not match the `package` and `version`, LuaRocks will fail.
 
 ## 4. Build Flow: Docker Compose Packager
 
-The primary packaging command is:
+The primary template command is:
 
 ```sh
-docker compose run --rm plugin-packager
+docker compose up --build
 ```
 
-This runs a short-lived Linux container based on Kong `3.4.2`. The container executes:
+Compose runs `plugin-packager` as a short-lived one-shot service before Kong starts. The service is based on Kong `3.4.2` and executes:
 
 ```text
 docker/package-plugins.sh
 ```
 
-That script uses LuaRocks from the Kong image to build each plugin into `build/out`.
+That script uses LuaRocks from the Kong image to build each plugin into `build/out`. You can still run only the packaging job with `docker compose run --rm --build plugin-packager`.
 
 The Makefile remains available as a Pongo-based alternative and has four main targets:
 
@@ -381,21 +384,28 @@ Expected output:
 build/out/kong-plugin-request-profiler-0.1.0-1.all.rock
 build/out/kong-plugin-json-field-guard-0.1.0-1.all.rock
 build/out/kong-plugin-canary-header-router-0.1.0-1.all.rock
+build/out/kong-plugin-saml-jwe-auth-0.1.0-1.all.rock
 ```
 
 ## 5. Runtime Flow: Docker Compose
 
-The runtime command is:
+The runtime command also performs packaging:
 
 ```sh
 docker compose up --build
 ```
 
-Compose starts two services:
+Compose runs one packaging job and starts three main services:
 
 ```yaml
 services:
+  plugin-packager:
+    ...
+
   echo:
+    ...
+
+  keycloak:
     ...
 
   kong:
@@ -447,12 +457,12 @@ CMD ["kong", "docker-start"]
 
 The custom entrypoint runs first. After installing plugins, it calls the official Kong Docker entrypoint.
 
-### 5.3 Optional `keycloak` service
+### 5.3 `keycloak` service
 
-The Keycloak service is optional and runs only when the `idp` profile is enabled:
+The Keycloak service starts with the default local stack:
 
 ```sh
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 ```
 
 It uses:
@@ -488,9 +498,9 @@ The SAML client is configured to sign both the SAML Response document and the em
 | Signature algorithm | `saml.signature.algorithm` | `RSA_SHA256` |
 | One-time-use condition | `saml.onetimeuse.condition` | `true` |
 
-This is intentionally decoupled from Kong plugin logic. Keycloak is only the IdP. A separate SAML SP/auth service should receive and validate SAML responses, then issue a short-lived internal JWT or session that a Kong guard plugin can enforce.
+Keycloak is intentionally decoupled from Kong plugin logic. It is only the IdP. The repo now includes a separate `saml-jwe-auth` Kong plugin that can act as the SAML SP/ACS component for local testing.
 
-The repo does not validate SAML XML inside Lua. That is deliberate. SAML validation requires XML canonicalization, signed-reference validation, replay protection, and XML signature wrapping defenses that should live in a dedicated auth service with a mature SAML library.
+The `saml-jwe-auth` plugin does not hand-roll XML signature logic in Lua. Its Lua handler manages the browser flow, RelayState, cookies, and upstream headers; its native C bridge uses libxml2, xmlsec1, and OpenSSL for signed Response validation, signed Assertion validation, and AES-256-GCM JWE cryptography.
 
 ## 6. How Rocks Are Installed Into Kong
 
@@ -553,6 +563,8 @@ There are three supported artifact paths:
 | Source plugin with a rockspec | `custom-plugins/<plugin>/*.rockspec` | Builds and packs it with LuaRocks inside the Kong `3.4.2` packager container |
 | Prebuilt proprietary rock | `custom-plugins/<plugin>/rocks/*.rock` or `custom-plugins/<plugin>/dist/*.rock` | Copies it into `build/out/` |
 | Native shared libraries | `custom-plugins/<plugin>/native/**/*.so*` | Stages them under `build/out/native/<plugin>/` |
+
+If a plugin has `custom-plugins/<plugin>/native/Makefile`, the Docker Compose packager runs `make -C custom-plugins/<plugin>/native clean all` before packaging the rock. That is how `saml-jwe-auth` builds `libkong_saml_jwe_auth.so` inside the Kong 3.4.2 Linux container instead of on the host machine.
 
 At container startup, `docker/kong-install-rocks.sh` handles native libraries before installing rocks:
 
@@ -649,7 +661,7 @@ A plugin is enabled when its name appears in `KONG_PLUGINS`.
 Current Compose config:
 
 ```yaml
-KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router
+KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,saml-jwe-auth
 ```
 
 Meaning:
@@ -660,6 +672,7 @@ Meaning:
 | `request-profiler` | Load custom plugin |
 | `json-field-guard` | Load custom plugin |
 | `canary-header-router` | Load custom plugin |
+| `saml-jwe-auth` | Load custom SAML/JWE plugin |
 
 Enabled means Kong loads the plugin handler and schema.
 
@@ -944,6 +957,38 @@ X-Release-Reason
 X-Release-Bucket
 ```
 
+### 9.4 `saml-jwe-auth`
+
+Files:
+
+```text
+custom-plugins/saml-jwe-auth/
+|-- kong-plugin-saml-jwe-auth-0.1.0-1.rockspec
+|-- kong/plugins/saml-jwe-auth/
+|   |-- handler.lua
+|   `-- schema.lua
+`-- native/
+    |-- Makefile
+    `-- kong_saml_jwe_auth.c
+```
+
+Enabled in Compose:
+
+```yaml
+KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,saml-jwe-auth
+```
+
+Configured in the default `kong/kong.yml` only for the local SAML demo service. It protects `/saml-demo` and handles the ACS callback on `/auth`, so the existing `/anything` and `/guarded` smoke-test routes do not require browser SSO.
+
+Behavior:
+
+1. During `rewrite` or `access`, it handles the configured ACS path, for example `/auth`.
+2. If no valid JWE is present, it creates a SAML AuthnRequest and redirects to the IdP SSO URL with the SAML HTTP-Redirect binding.
+3. It encrypts RelayState as JWE so the callback can be bound to the AuthnRequest ID and original return URL.
+4. On ACS POST, it validates the signed Response and signed Assertion through the native xmlsec/OpenSSL bridge.
+5. It extracts the configured SAML attributes, issues an encrypted JWE session cookie, and redirects back to the original URL.
+6. On later requests, it decrypts and authenticates the JWE, then sets configured upstream identity headers.
+
 ## 10. Replacing The Example Plugins With Work Plugins
 
 Use this exact sequence.
@@ -1040,13 +1085,13 @@ services:
               some_setting: true
 ```
 
-### Step 6: Package
+### Step 6: Package And Start
 
 ```sh
-docker compose run --rm plugin-packager
+docker compose up --build
 ```
 
-Confirm:
+Compose runs the packager first and then starts Kong. To confirm the generated rock:
 
 ```sh
 ls build/out
@@ -1058,13 +1103,7 @@ You should see:
 kong-plugin-my-work-plugin-0.1.0-1.all.rock
 ```
 
-### Step 7: Start Kong
-
-```sh
-docker compose up --build
-```
-
-### Step 8: Verify install and load
+### Step 7: Verify install and load
 
 Check enabled plugins:
 
@@ -1091,7 +1130,7 @@ installing Kong plugin rock: /rocks/kong-plugin-my-work-plugin-0.1.0-1.all.rock
 kong-plugin-my-work-plugin 0.1.0-1 is now installed in /usr/local
 ```
 
-### Step 9: Add smoke tests
+### Step 8: Add smoke tests
 
 Update:
 
@@ -1119,7 +1158,7 @@ tests/postman/run-collection.ps1
 
 It performs:
 
-1. Optional packaging with `docker compose run --rm plugin-packager`.
+1. Optional packaging with `docker compose run --rm --build plugin-packager`.
 2. Rock existence check in `build/out`.
 3. Compose startup.
 4. Kong readiness polling.
@@ -1136,7 +1175,7 @@ build/postman/newman-results.json
 Expected pass summary:
 
 ```text
-Postman summary: requests=10/10, assertions=27/27, failures=0
+Postman summary: requests=11/11, assertions=30/30, failures=0
 ```
 
 Useful commands:
@@ -1154,7 +1193,7 @@ mvn package
 mvn verify
 ```
 
-`mvn package` packages plugin rocks. `mvn verify` packages rocks, starts Kong, runs the Compose Newman smoke tests, and stops Compose.
+`mvn package` packages plugin rocks. `mvn verify` packages rocks, starts Kong, Keycloak, and echo, runs the Compose Newman smoke tests, runs the Keycloak SAML collection, runs the SAML browser-flow check, and stops Compose.
 
 The script also detects busy default ports and chooses free alternatives for the run.
 
@@ -1164,7 +1203,7 @@ The Keycloak SAML runner is:
 tests/postman/run-keycloak-saml-collection.ps1
 ```
 
-It starts the optional `keycloak` service with the `idp` profile, waits for SAML metadata, and runs:
+It starts the `keycloak` service if needed, waits for SAML metadata, and runs:
 
 ```text
 tests/postman/Keycloak_SAML_IdP.postman_collection.json
@@ -1180,6 +1219,18 @@ Expected pass summary:
 
 ```text
 Keycloak SAML summary: requests=11/11, assertions=26/26, failures=0
+```
+
+The SAML browser-flow check is:
+
+```text
+tests/postman/saml-browser-flow-check.js
+```
+
+Run it inside Docker Compose:
+
+```sh
+docker compose run --rm --entrypoint node newman /etc/newman/saml-browser-flow-check.js
 ```
 
 The same request coverage is available without Postman:
@@ -1324,8 +1375,7 @@ Cause:
 Fix:
 
 ```sh
-docker compose run --rm plugin-packager
-docker compose up --build
+docker compose up --build --force-recreate
 ```
 
 For debugging only, you can allow startup without rocks:
@@ -1360,9 +1410,8 @@ The Postman runner handles this automatically.
 For work plugins, keep the loop tight:
 
 1. Edit `handler.lua`, `schema.lua`, or the rockspec.
-2. Run `docker compose run --rm plugin-packager`.
-3. Run `docker compose up --build`.
-4. Watch logs:
+2. Run `docker compose up --build --force-recreate`.
+3. Watch logs:
 
 ```sh
 docker compose logs -f kong
@@ -1404,7 +1453,7 @@ Before calling a plugin ready, verify:
 - Plugin has `schema.lua`.
 - Rockspec filename matches `package` and `version`.
 - Rockspec `modules` paths match real files.
-- `docker compose run --rm plugin-packager` creates a `.rock` in `build/out`.
+- `docker compose up --build` runs the packager and creates a `.rock` in `build/out`.
 - Compose mounts `build/out` into `/rocks`.
 - Startup logs show `luarocks install --force`.
 - Plugin name appears in `KONG_PLUGINS`.

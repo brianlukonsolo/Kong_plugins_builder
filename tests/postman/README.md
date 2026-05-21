@@ -5,7 +5,8 @@ This folder has two Postman/Newman suites:
 | Collection | Runner | Purpose |
 | --- | --- | --- |
 | `Kong_3_4_2_Custom_Plugins.postman_collection.json` | `run-collection.ps1` | Validates Kong, the custom plugins, and the local echo upstream |
-| `Keycloak_SAML_IdP.postman_collection.json` | `run-keycloak-saml-collection.ps1` | Validates the optional Keycloak SAML IdP realm, SAML endpoints, and signing config |
+| `Keycloak_SAML_IdP.postman_collection.json` | `run-keycloak-saml-collection.ps1` | Validates the Keycloak SAML IdP realm, SAML endpoints, and signing config |
+| `saml-browser-flow-check.js` | Docker Compose `newman` service with Node entrypoint | Exercises the SP-initiated browser SAML flow end to end |
 
 ## Kong Plugin Collection
 
@@ -14,9 +15,11 @@ The Kong collection validates the local Kong 3.4.2 setup end to end:
 - Kong status and Admin API are reachable.
 - Kong reports version `3.4.2`.
 - The custom plugins are enabled.
+- `saml-jwe-auth` is installed, enabled, and attached only to the SAML demo route.
 - `request-profiler` adds correlation and timing headers.
 - `canary-header-router` forces stable/canary tracks with headers.
 - `json-field-guard` accepts valid JSON and rejects missing, forbidden, or non-JSON payloads.
+- `saml-jwe-auth` redirects `/saml-demo` to Keycloak when no JWE session exists.
 
 ## Run Everything
 
@@ -28,7 +31,7 @@ From the repo root:
 
 The script:
 
-1. Runs `docker compose run --rm plugin-packager`.
+1. Runs `docker compose run --rm --build plugin-packager`.
 2. Confirms `.rock` files exist in `build/out`.
 3. Starts `docker compose up -d --build`.
 4. Auto-picks free host ports if the default Kong ports are already busy.
@@ -65,7 +68,7 @@ From the repo root:
 
 The script:
 
-1. Starts `keycloak` with `docker compose --profile idp up -d keycloak`.
+1. Starts `keycloak` with `docker compose up -d keycloak`.
 2. Waits for the realm SAML metadata endpoint.
 3. Runs `Keycloak_SAML_IdP.postman_collection.json` with the Compose `newman` service.
 4. Writes results to `build/postman/keycloak-saml-newman-results.json`.
@@ -97,7 +100,17 @@ For manual Postman use, import:
 Then start Keycloak with:
 
 ```powershell
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 ```
 
 Select the `Keycloak SAML Local` environment and run the collection.
+
+## SAML Browser-Flow Check
+
+After the stack is running, execute the SP-initiated login journey inside Docker Compose:
+
+```powershell
+docker compose run --rm --entrypoint node newman /etc/newman/saml-browser-flow-check.js
+```
+
+The script requests `/saml-demo`, logs in to Keycloak as `alice`, posts the signed `SAMLResponse` to `/auth`, follows the final redirect, and confirms the upstream receives `X-Authenticated-User: alice` and `X-Authenticated-Email: alice@example.test`.

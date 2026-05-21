@@ -2,15 +2,15 @@
 
 This folder contains a local Keycloak realm export for SAML development.
 
-It is intentionally decoupled from the Kong plugins. Keycloak is only the IdP. A separate SAML service provider/auth service should validate SAML responses and then issue a short-lived internal token or session for Kong to enforce.
+It is intentionally decoupled from the Kong plugin implementation. Keycloak is only the IdP. The `saml-jwe-auth` Kong plugin is the local SAML service provider / ACS component that validates SAML responses and then issues an encrypted JWE session for Kong to enforce.
 
 ## Start Keycloak
 
 ```sh
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 ```
 
-Plain `docker compose up --build` does not start Keycloak because this service is behind the optional `idp` profile.
+Plain `docker compose up --build` starts Keycloak with Kong and the echo upstream.
 
 Admin console:
 
@@ -28,7 +28,7 @@ password: admin
 Override them without editing the repo:
 
 ```sh
-KEYCLOAK_ADMIN=my-admin KEYCLOAK_ADMIN_PASSWORD=my-password docker compose --profile idp up -d keycloak
+KEYCLOAK_ADMIN=my-admin KEYCLOAK_ADMIN_PASSWORD=my-password docker compose up -d keycloak
 ```
 
 ## Imported Realm
@@ -86,16 +86,47 @@ http://localhost:18080/realms/kong-plugin-lab/protocol/saml/clients/kong-saml-au
 Configured ACS URLs:
 
 ```text
+http://localhost:8000/auth
 http://localhost:8000/saml/acs
 http://localhost:8082/saml/acs
 ```
 
-There is no SAML auth service in this repo yet. Those ACS URLs are placeholders for the decoupled service provider component that should validate SAML and issue an internal session/JWT for Kong.
+`http://localhost:8000/auth` matches the default `acs_path` used by the `saml-jwe-auth` plugin. The other ACS URLs are retained as local development alternatives.
+
+## Browser Check
+
+Start the stack:
+
+```sh
+docker compose up -d --build --wait --wait-timeout 240
+```
+
+Then open:
+
+```text
+http://localhost:8000/saml-demo
+```
+
+Log in with:
+
+```text
+username: alice
+password: alice-password
+```
+
+Keycloak posts the signed SAML response to `http://localhost:8000/auth`. Kong validates it, sets the `kong_saml_session` JWE cookie, and redirects back to `/saml-demo`.
+
+If Keycloak was already running before this file changed, recreate the container to re-import the realm:
+
+```sh
+docker compose rm -sf keycloak
+docker compose up -d keycloak
+```
 
 ## Verify Import
 
 ```sh
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 curl http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor
 ```
 
@@ -116,6 +147,6 @@ This runs `tests/postman/Keycloak_SAML_IdP.postman_collection.json` through Dock
 The Keycloak container uses container-local dev storage. To force a fresh import:
 
 ```sh
-docker compose --profile idp rm -sf keycloak
-docker compose --profile idp up -d keycloak
+docker compose rm -sf keycloak
+docker compose up -d keycloak
 ```

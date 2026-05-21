@@ -324,7 +324,7 @@
               "});",
               "",
               "pm.test(\"ACS and logout URLs are configured\", function () {",
-              "  pm.expect(attrs[\"saml_assertion_consumer_url_post\"]).to.eql(\"http://localhost:8000/saml/acs\");",
+              "  pm.expect(attrs[\"saml_assertion_consumer_url_post\"]).to.eql(\"http://localhost:8000/auth\");",
               "  pm.expect(attrs[\"saml_single_logout_service_url_post\"]).to.eql(\"http://localhost:8000/saml/sls\");",
               "});",
               "",

@@ -17,7 +17,7 @@ $resultsFile = Join-Path $resultsDir "keycloak-saml-newman-results.json"
 Set-Location $repoRoot
 
 function Test-KeycloakRunning {
-    $services = docker compose --profile idp ps --status running --services
+    $services = docker compose ps --status running --services
     return @($services) -contains "keycloak"
 }
 
@@ -106,7 +106,7 @@ try {
     $env:KEYCLOAK_ADMIN = $AdminUsername
     $env:KEYCLOAK_ADMIN_PASSWORD = $AdminPassword
 
-    Invoke-CheckedCommand "Starting Keycloak with docker compose" { docker compose --profile idp up -d keycloak }
+    Invoke-CheckedCommand "Starting Keycloak with docker compose" { docker compose up -d keycloak }
     Wait-ForKeycloak -Port $KeycloakPort
     $exitCode = Invoke-Newman
     Write-NewmanSummary
@@ -116,8 +116,8 @@ try {
 } finally {
     if (-not $KeepRunning -and -not $keycloakWasRunning) {
         Write-Host "----> Stopping Keycloak"
-        docker compose --profile idp stop keycloak
-        docker compose --profile idp rm -f keycloak
+        docker compose stop keycloak
+        docker compose rm -f keycloak
     }
 }
 

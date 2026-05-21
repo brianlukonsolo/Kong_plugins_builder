@@ -88,7 +88,7 @@ function Assert-PackagedRocks {
     $rocks = Get-ChildItem -Path $rockDir -Filter "*.rock" -ErrorAction SilentlyContinue
 
     if (-not $rocks) {
-        throw "No .rock files found in build/out. Run 'docker compose run --rm plugin-packager' first, or rerun this script without -SkipPackage."
+        throw "No .rock files found in build/out. Run 'docker compose run --rm --build plugin-packager' first, or rerun this script without -SkipPackage."
     }
 
     Write-Host "----> Found $($rocks.Count) packaged rock file(s)"
@@ -171,7 +171,7 @@ try {
     Write-Host "----> Using ports: proxy=$resolvedProxyPort admin=$resolvedAdminPort status=$resolvedStatusPort"
 
     if (-not $SkipPackage) {
-        Invoke-CheckedCommand "Packaging plugin rocks with docker compose" { docker compose run --rm plugin-packager }
+        Invoke-CheckedCommand "Packaging plugin rocks with docker compose" { docker compose run --rm --build plugin-packager }
     }
 
     Assert-PackagedRocks

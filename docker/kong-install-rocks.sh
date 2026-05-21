@@ -76,7 +76,7 @@ if [ "$FOUND_ROCKS" = "0" ]; then
   echo "----> no .rock files found in $ROCKS_DIR"
 
   if [ "$REQUIRE_ROCKS" = "true" ]; then
-    echo "----> run 'make package' before starting Kong"
+    echo "----> add at least one plugin under custom-plugins/ and run 'docker compose up --build'"
     exit 1
   fi
 fi

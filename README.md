@@ -7,24 +7,40 @@
 
 This repo is a local, containerized Kong plugin lab.
 
-In plain English: you put Lua Kong plugins into `custom-plugins/`, run `docker compose run --rm plugin-packager`, and the repo turns those plugins into LuaRocks `.rock` files inside a Kong `3.4.2` container. Then `docker compose up --build` starts Kong Gateway `3.4.2`, automatically installs those `.rock` files, loads the plugins, and exposes Kong locally.
+Overview: put Lua Kong plugins into `custom-plugins/`, run `docker compose up --build`, and the repo builds those plugins into LuaRocks `.rock` files before Kong starts. Kong Gateway `3.4.2` then installs those `.rock` files, loads the enabled plugins, and exposes everything locally.
 
 The sample plugins are only examples. For work, you will replace them with your real plugins but keep the same packaging and runtime pattern.
 
-For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_README.md). It explains exactly how plugins are built, installed, enabled, and configured.
+If you are copying this repo as a template, start with [`TEMPLATE_USAGE.md`](TEMPLATE_USAGE.md). For the deeper implementation details, read [`TECHNICAL_README.md`](TECHNICAL_README.md).
 
 ## 🟢 Quick Start
 
-Package the plugins:
-
-```sh
-docker compose run --rm plugin-packager
-```
-
-Start Kong:
+One command packages plugins, starts Keycloak, starts Kong, and installs the generated rocks:
 
 ```sh
 docker compose up --build
+```
+
+What happens:
+
+- 📦 `plugin-packager` builds every plugin under `custom-plugins/`.
+- 🪨 `.rock` files are written to `build/out/`.
+- 🔐 Keycloak starts by default for SAML testing.
+- 🦍 Kong starts and installs the generated rocks.
+- 🧪 `kong/kong.yml` decides which plugins run on which routes.
+
+If the stack is already running and you changed plugin source, recreate the containers so Kong installs the fresh rocks:
+
+```sh
+docker compose up --build --force-recreate
+```
+
+Template checklist:
+
+```text
+Add source in custom-plugins/  -> built automatically
+Add name to KONG_PLUGINS      -> Kong can load it
+Add config to kong/kong.yml   -> Kong actually runs it
 ```
 
 Run the automated Postman/Newman tests:
@@ -49,29 +65,37 @@ Maven automation:
 
 | Command | What It Does |
 | --- | --- |
-| `mvn package` | Packages plugin rocks through `docker compose run --rm plugin-packager` |
-| `mvn verify` | Packages rocks, starts Kong, runs Compose Newman tests, then stops Compose |
+| `mvn package` | Packages plugin rocks through `docker compose run --rm --build plugin-packager` |
+| `mvn verify` | Packages rocks, starts Kong, Keycloak, runs Compose Newman tests and the SAML browser-flow check, then stops Compose |
 | `mvn -Ddocker.compose.skip=true verify` | Runs Maven without Docker Compose automation |
 
-Optional local Keycloak SAML IdP:
+Local Keycloak SAML IdP:
 
 ```sh
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 ```
 
-Plain `docker compose up --build` does not start Keycloak because the service is behind the optional `idp` profile.
+Plain `docker compose up --build` starts Keycloak too.
 
 Keycloak runs at `http://localhost:18080` and imports the `kong-plugin-lab` realm from `keycloak/realm-export.json`.
+
+If Keycloak was already running before you changed the realm export, recreate the `keycloak` container so the new `/auth` ACS URL is imported.
 
 Useful local URLs:
 
 | Purpose | URL |
 | --- | --- |
-| 🟢 Kong proxy | `http://localhost:8000` |
-| 🔵 Kong Admin API | `http://localhost:8001` |
-| 🟣 Kong status API | `http://localhost:8100/status` |
+| Kong proxy | `http://localhost:8000` |
+| Kong Admin API | `http://localhost:8001` |
+| Kong status API | `http://localhost:8100/status` |
+| Keycloak admin console | `http://localhost:18080/admin` |
+| Keycloak SAML metadata | `http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor` |
+| SAML protected demo route | `http://localhost:8000/saml-demo` |
+| SAML ACS callback route | `http://localhost:8000/auth` |
 
 If port `8000` is already busy, the Postman runner automatically chooses a free port for that test run.
+
+Optional local overrides live in `.env.example`. Copy it to `.env` only if you want to change ports, Keycloak admin credentials, or native build settings.
 
 ## 🧠 Big Picture
 
@@ -79,8 +103,8 @@ The repo has two separate jobs:
 
 | Job | Tool | What It Does |
 | --- | --- | --- |
-| 📦 Build plugins | `docker compose run --rm plugin-packager` | Converts Lua plugin folders into `.rock` files inside a Kong `3.4.2` container |
-| 🚀 Run Kong locally | Docker Compose | Starts Kong `3.4.2` and installs those `.rock` files |
+| 📦 Build plugins | `plugin-packager` Compose job | Converts Lua plugin folders into `.rock` files inside a Kong `3.4.2` container |
+| 🚀 Run Kong locally | `docker compose up --build` | Runs the packager first, then starts Kong `3.4.2` and installs those `.rock` files |
 
 Important version note:
 
@@ -107,7 +131,8 @@ So these versions are now aligned:
 ├── custom-plugins/
 │   ├── request-profiler/
 │   ├── json-field-guard/
-│   └── canary-header-router/
+│   ├── canary-header-router/
+│   └── saml-jwe-auth/
 ├── build/out/
 ├── docker/
 │   ├── kong.Dockerfile
@@ -132,10 +157,12 @@ What each folder means:
 | 🟢 `custom-plugins/` | The actual Lua Kong plugin source lives here |
 | 🟡 `build/out/` | Generated `.rock` files land here after packaging |
 | 🔵 `docker/` | Docker image files and helper scripts |
-| 🔐 `keycloak/` | Optional local Keycloak realm export for SAML IdP testing |
+| 🔐 `keycloak/` | Local Keycloak realm export for SAML IdP testing |
 | 🟣 `kong/kong.yml` | Kong DB-less config: services, routes, and enabled plugin instances |
 | 🟠 `tests/` | Automated smoke tests in Postman, Insomnia, and Bash/curl formats |
 | ⚪ `src/` | Existing Maven archetype files; not used by the Kong runtime |
+| 🌈 `.env.example` | Optional local environment overrides for ports and credentials |
+| 🧩 `TEMPLATE_USAGE.md` | Copy-from-template checklist and plugin replacement guide |
 
 ## 🔁 Full Flow
 
@@ -146,7 +173,9 @@ Lua plugin source
       ↓
 custom-plugins/<plugin-name>/
       ↓
-docker compose run --rm plugin-packager
+docker compose up --build
+      ↓
+plugin-packager job
       ↓
 build/out/*.rock
       ↓
@@ -185,10 +214,16 @@ The Docker Compose packager finds every folder under `custom-plugins/` that cont
 PLUGIN_DIRS := $(wildcard custom-plugins/*)
 ```
 
-Then this command packages them inside a Kong `3.4.2` container:
+The normal template command packages them inside a Kong `3.4.2` container before Kong starts:
 
 ```sh
-docker compose run --rm plugin-packager
+docker compose up --build
+```
+
+You can still run the packager by itself when you only want to rebuild rocks:
+
+```sh
+docker compose run --rm --build plugin-packager
 ```
 
 That creates:
@@ -197,6 +232,7 @@ That creates:
 build/out/kong-plugin-request-profiler-0.1.0-1.all.rock
 build/out/kong-plugin-json-field-guard-0.1.0-1.all.rock
 build/out/kong-plugin-canary-header-router-0.1.0-1.all.rock
+build/out/kong-plugin-saml-jwe-auth-0.1.0-1.all.rock
 ```
 
 🟡 `build/out/` is generated output. Do not edit those files by hand.
@@ -364,12 +400,13 @@ Native compatibility rules:
 
 ## 🚀 How Kong Starts Locally
 
-Docker Compose starts two services:
+Docker Compose starts three main services:
 
 | Service | Purpose |
 | --- | --- |
-| 🟦 `kong` | Kong Gateway `3.4.2` with the custom plugin installer |
-| 🟩 `echo` | A tiny local upstream used by tests |
+| `kong` | Kong Gateway `3.4.2` with the custom plugin installer |
+| `echo` | A tiny local upstream used by tests |
+| `keycloak` | Local SAML IdP used by the SAML/JWE demo flow |
 
 The echo service means tests do not need the internet. Kong proxies to:
 
@@ -416,7 +453,7 @@ Kong needs two things:
 In `docker-compose.yml`:
 
 ```yaml
-KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router
+KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,saml-jwe-auth
 ```
 
 Meaning:
@@ -513,6 +550,18 @@ Useful for:
 - Sticky release-track decisions
 - Testing header-based routing logic
 
+### `saml-jwe-auth`
+
+What it does:
+
+- Starts browser SAML login when a request has no valid JWE session.
+- Exposes a configurable ACS path, for example `/auth`.
+- Validates signed SAML Response and signed Assertion with libxml2, xmlsec1, and OpenSSL.
+- Extracts configured SAML attributes into an encrypted JWE session.
+- Sends configured trusted identity headers upstream after the JWE is valid.
+
+This plugin is packaged, enabled, and attached to the local SAML demo service in `kong/kong.yml`. The protected route is `/saml-demo`; the ACS callback route is `/auth`.
+
 ## 🧪 Automated Smoke Tests
 
 The easiest verification command is still the Postman/Newman runner:
@@ -523,7 +572,7 @@ The easiest verification command is still the Postman/Newman runner:
 
 The script does this automatically:
 
-1. 📦 Runs `docker compose run --rm plugin-packager`.
+1. 📦 Runs `docker compose run --rm --build plugin-packager`.
 2. 🔎 Confirms `.rock` files exist in `build/out`.
 3. 🚀 Starts Docker Compose.
 4. ⏳ Waits for Kong to become ready.
@@ -534,7 +583,7 @@ The script does this automatically:
 Expected summary:
 
 ```text
-Postman summary: requests=10/10, assertions=27/27, failures=0
+Postman summary: requests=11/11, assertions=30/30, failures=0
 ```
 
 Useful options:
@@ -552,15 +601,15 @@ The same requests are also available without Postman:
 | Insomnia | `tests/insomnia/Kong_3_4_2_Custom_Plugins.insomnia.json` | Import into Insomnia and run the collection |
 | Bash/curl | `tests/bash/run-curl-tests.sh` | Run `bash tests/bash/run-curl-tests.sh` after Kong is up |
 
-## 🔐 Optional Keycloak SAML IdP
+## 🔐 Local Keycloak SAML IdP
 
-This repo includes an optional Keycloak service for local SAML IdP testing. It is deliberately separate from the Kong plugins.
+This repo includes a Keycloak service for local SAML IdP testing. It is deliberately separate from the Kong plugins.
 
 ```sh
-docker compose --profile idp up -d keycloak
+docker compose up -d keycloak
 ```
 
-Plain `docker compose up --build` starts the default Kong lab services only. It does not start Keycloak unless you include `--profile idp`.
+Plain `docker compose up --build` starts Keycloak with Kong and the echo upstream.
 
 Keycloak details:
 
@@ -583,19 +632,37 @@ The SAML client is configured for both signed response documents and signed asse
 | Signature algorithm | `saml.signature.algorithm` | `RSA_SHA256` |
 | One-time-use condition | `saml.onetimeuse.condition` | `true` |
 
-The intended decoupled flow is:
+The intended local plugin flow is:
 
 ```text
 Keycloak IdP
-      ↓ SAMLResponse
-SAML auth service / SP
-      ↓ short-lived internal token or session
-Kong guard plugin
-      ↓ trusted identity headers
+      -> signed SAMLResponse and signed Assertion
+Kong saml-jwe-auth plugin ACS path, for example /auth
+      -> encrypted JWE session cookie
+Kong saml-jwe-auth plugin checks the encrypted JWE on later requests
+      -> trusted identity headers
 upstream API
 ```
 
-Do not validate SAML XML signatures inside a Kong Lua plugin. Keep that in a dedicated auth service that uses a mature SAML library and validates signed response, signed assertion, issuer, audience, destination, recipient, timestamps, replay protection, and XML signature wrapping defenses.
+The plugin keeps XML signature validation and JWE cryptography in a native C bridge backed by libxml2, xmlsec1, and OpenSSL. It validates signed response, signed assertion, issuer, audience, destination, recipient, timestamps, replay protection, and matching `InResponseTo`.
+
+The default `kong/kong.yml` attaches `saml-jwe-auth` only to the SAML demo service. The existing `/anything` and `/guarded` smoke-test routes do not require browser SSO.
+
+Local SAML demo routes:
+
+| Route | Purpose |
+| --- | --- |
+| `http://localhost:8000/saml-demo` | Protected route that starts SP-initiated SAML login when no JWE session exists |
+| `http://localhost:8000/auth` | Assertion Consumer Service callback used by Keycloak |
+
+Browser journey:
+
+1. Open `http://localhost:8000/saml-demo`.
+2. Kong redirects to Keycloak.
+3. Log in with `alice` / `alice-password`.
+4. Keycloak posts a signed `SAMLResponse` and `RelayState` to `http://localhost:8000/auth`.
+5. Kong validates the signed Response and signed Assertion, sets the `kong_saml_session` JWE cookie, then redirects back to `/saml-demo`.
+6. The echo upstream response should show `X-Authenticated-User: alice` and `X-Authenticated-Email: alice@example.test`.
 
 See `keycloak/README.md` for the exact imported realm settings and reset commands.
 
@@ -603,6 +670,12 @@ Run the Keycloak SAML Postman/Newman checks with:
 
 ```powershell
 .\tests\postman\run-keycloak-saml-collection.ps1
+```
+
+Run the full SAML login journey check inside Docker Compose with:
+
+```powershell
+docker compose run --rm --entrypoint node newman /etc/newman/saml-browser-flow-check.js
 ```
 
 ## 🧭 Manual Checks
@@ -720,7 +793,7 @@ build = {
 In `docker-compose.yml`, change:
 
 ```yaml
-KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router
+KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,saml-jwe-auth
 ```
 
 To something like:
@@ -762,7 +835,7 @@ services:
               enabled_feature: true
 ```
 
-Rule of thumb:
+Placement guide:
 
 | Placement | Use When |
 | --- | --- |
@@ -774,9 +847,10 @@ Rule of thumb:
 ### 5. Package And Run
 
 ```sh
-docker compose run --rm plugin-packager
 docker compose up --build
 ```
+
+That one command runs the `plugin-packager` job first, writes fresh rocks into `build/out/`, then starts Kong.
 
 ### 6. Update Smoke Tests
 
@@ -812,7 +886,7 @@ Use this before sharing your work version:
 - 🟢 Plugin has `handler.lua`.
 - 🟢 Plugin has `schema.lua`.
 - 🟢 Plugin has a matching `kong-plugin-<name>-<version>.rockspec`.
-- 🟢 `docker compose run --rm plugin-packager` creates a `.rock` file in `build/out`.
+- 🟢 `docker compose up --build` runs the packager and creates `.rock` files in `build/out`.
 - 🟢 `docker-compose.yml` includes the plugin name in `KONG_PLUGINS`.
 - 🟢 `kong/kong.yml` configures the plugin where it should run.
 - 🟢 `docker compose up --build` starts successfully.
@@ -832,8 +906,7 @@ build/out/ is empty
 Fix:
 
 ```sh
-docker compose run --rm plugin-packager
-docker compose up --build
+docker compose up --build --force-recreate
 ```
 
 ### 🔴 Kong says the plugin is enabled but not installed
@@ -938,7 +1011,7 @@ Generated folders:
 | `build/out/` | ✅ Yes | Recreated by packaging |
 | `build/postman/` | ✅ Yes | Recreated by the Postman runner |
 
-## 🧷 Final Mental Model
+## 🧷 Architecture Summary
 
 Think of the repo like this:
 

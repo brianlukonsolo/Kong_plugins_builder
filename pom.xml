@@ -9,6 +9,8 @@
   <properties>
     <docker.compose.skip>false</docker.compose.skip>
     <exec-maven-plugin.version>3.5.0</exec-maven-plugin.version>
+    <keycloak.admin.username>admin</keycloak.admin.username>
+    <keycloak.admin.password>admin</keycloak.admin.password>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -32,6 +34,7 @@
                 <argument>compose</argument>
                 <argument>run</argument>
                 <argument>--rm</argument>
+                <argument>--build</argument>
                 <argument>plugin-packager</argument>
               </arguments>
             </configuration>
@@ -53,9 +56,7 @@
                 <argument>--build</argument>
                 <argument>--wait</argument>
                 <argument>--wait-timeout</argument>
-                <argument>120</argument>
-                <argument>echo</argument>
-                <argument>kong</argument>
+                <argument>240</argument>
               </arguments>
             </configuration>
           </execution>
@@ -74,6 +75,62 @@
                 <argument>run</argument>
                 <argument>--rm</argument>
                 <argument>newman</argument>
+              </arguments>
+            </configuration>
+          </execution>
+
+          <execution>
+            <id>compose-keycloak-newman</id>
+            <phase>integration-test</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <skip>${docker.compose.skip}</skip>
+              <executable>docker</executable>
+              <arguments>
+                <argument>compose</argument>
+                <argument>run</argument>
+                <argument>--rm</argument>
+                <argument>--no-deps</argument>
+                <argument>newman</argument>
+                <argument>run</argument>
+                <argument>/etc/newman/Keycloak_SAML_IdP.postman_collection.json</argument>
+                <argument>-e</argument>
+                <argument>/etc/newman/keycloak.postman_environment.json</argument>
+                <argument>--env-var</argument>
+                <argument>keycloak_url=http://keycloak:8080</argument>
+                <argument>--env-var</argument>
+                <argument>admin_username=${keycloak.admin.username}</argument>
+                <argument>--env-var</argument>
+                <argument>admin_password=${keycloak.admin.password}</argument>
+                <argument>--reporters</argument>
+                <argument>cli,json</argument>
+                <argument>--reporter-json-export</argument>
+                <argument>/etc/newman-results/keycloak-saml-newman-results.json</argument>
+                <argument>--color</argument>
+                <argument>on</argument>
+              </arguments>
+            </configuration>
+          </execution>
+
+          <execution>
+            <id>compose-saml-browser-flow</id>
+            <phase>integration-test</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <skip>${docker.compose.skip}</skip>
+              <executable>docker</executable>
+              <arguments>
+                <argument>compose</argument>
+                <argument>run</argument>
+                <argument>--rm</argument>
+                <argument>--entrypoint</argument>
+                <argument>node</argument>
+                <argument>newman</argument>
+                <argument>/etc/newman/saml-browser-flow-check.js</argument>
               </arguments>
             </configuration>
           </execution>

@@ -2,7 +2,7 @@
   "realm": "kong-plugin-lab",
   "displayName": "Kong Plugin Lab",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "registrationAllowed": false,
   "registrationEmailAsUsername": false,
   "rememberMe": false,
@@ -16,12 +16,13 @@
     {
       "clientId": "kong-saml-auth-service",
       "name": "Kong SAML Auth Service",
-      "description": "Local SAML SP placeholder for a decoupled auth service in front of Kong APIs.",
+      "description": "Local SAML SP configuration for the Kong saml-jwe-auth plugin.",
       "enabled": true,
       "protocol": "saml",
       "publicClient": true,
       "frontchannelLogout": true,
       "redirectUris": [
+        "http://localhost:8000/auth",
         "http://localhost:8000/saml/acs",
         "http://localhost:8082/saml/acs"
       ],
@@ -40,8 +41,8 @@
         "saml_signature_canonicalization_method": "http://www.w3.org/2001/10/xml-exc-c14n#",
         "saml_single_logout_service_url_post": "http://localhost:8000/saml/sls",
         "saml_single_logout_service_url_redirect": "http://localhost:8000/saml/sls",
-        "saml_assertion_consumer_url_post": "http://localhost:8000/saml/acs",
-        "saml_assertion_consumer_url_redirect": "http://localhost:8000/saml/acs",
+        "saml_assertion_consumer_url_post": "http://localhost:8000/auth",
+        "saml_assertion_consumer_url_redirect": "http://localhost:8000/auth",
         "saml_idp_initiated_sso_url_name": "kong-saml-auth-service",
         "saml_idp_initiated_sso_relay_state": ""
       },

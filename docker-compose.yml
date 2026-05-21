@@ -1,4 +1,6 @@
 services:
+  # 📦 One-shot template job.
+  # `docker compose up --build` runs this before Kong so new plugin folders become fresh .rock files.
   plugin-packager:
     build:
       context: .
@@ -6,8 +8,7 @@ services:
       args:
         INSTALL_NATIVE_BUILD_DEPS: "${INSTALL_NATIVE_BUILD_DEPS:-false}"
     image: local/kong-plugin-packager:3.4.2
-    profiles:
-      - tools
+    restart: "no"
     volumes:
       - .:/workspace
 
@@ -21,8 +22,6 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.4.0
     container_name: kong-plugins-keycloak
-    profiles:
-      - idp
     command:
       - start-dev
       - --import-realm
@@ -65,8 +64,10 @@ services:
       KONG_NATIVE_LIB_DIR: /usr/local/lib/kong-plugins
       KONG_NATIVE_LIBS_SOURCE_DIR: /rocks/native
       KONG_NGINX_MAIN_ENV: LD_LIBRARY_PATH
+      KONG_NGINX_HTTP_LUA_SHARED_DICT: kong_saml_jwe_auth_replay 10m
       KONG_NGINX_WORKER_PROCESSES: "1"
-      KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router
+      # 🧩 Add your custom plugin names here after `bundled`.
+      KONG_PLUGINS: bundled,request-profiler,json-field-guard,canary-header-router,saml-jwe-auth
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_PROXY_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
@@ -75,7 +76,12 @@ services:
       KONG_ROCKS_DIR: /rocks
       KONG_STATUS_LISTEN: 0.0.0.0:8100
     depends_on:
-      - echo
+      plugin-packager:
+        condition: service_completed_successfully
+      echo:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
     ports:
       - "${KONG_PROXY_PORT:-8000}:8000"
       - "${KONG_PROXY_SSL_PORT:-8443}:8443"
