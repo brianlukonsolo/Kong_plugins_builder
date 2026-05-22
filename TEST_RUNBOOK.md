@@ -223,10 +223,10 @@ docker compose logs -f kong | Select-String "saml-jwe-auth debug"
 
 The local `kong/kong.yml` demo config currently has `debug_enabled`, `debug_log_saml_response`, and `debug_log_max_bytes` turned on for this SAML route. The log shows the received `SAMLResponse` POST value, decoded SAML XML, validation result, subject, and mapped attributes.
 
-For the full copyable base64 value, use the capture file written to `build/saml-debug`:
+For the full copyable base64 value, use the capture file written to `saml-plugin-outputs`:
 
 ```powershell
-$latest = Get-ChildItem .\build\saml-debug\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latest = Get-ChildItem .\saml-plugin-outputs\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Get-Content -Raw $latest.FullName
 ```
 

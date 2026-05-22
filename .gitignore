@@ -37,6 +37,7 @@ custom-plugins/*/logs/
 /nbdist/
 /.nb-gradle/
 build/
+saml-plugin-outputs/
 !**/src/main/**/build/
 !**/src/test/**/build/
 

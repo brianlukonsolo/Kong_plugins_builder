@@ -159,7 +159,7 @@ The plugin has an explicit local debug mode for inspecting the ACS callback. The
 | `debug_enabled` | `true` | Writes SAML flow debug lines to the Kong container log. |
 | `debug_log_saml_response` | `true` | Logs the raw `SAMLResponse` POST value and the decoded XML. |
 | `debug_log_max_bytes` | `20000` | Truncates large logged SAML values after this many bytes. |
-| `debug_capture_dir` | `/kong-saml-debug` | Writes full, copyable debug files into the mounted `build/saml-debug` folder. |
+| `debug_capture_dir` | `/kong-saml-debug` | Writes full, copyable debug files into the mounted `saml-plugin-outputs` folder. |
 
 Watch the plugin logs while you run the browser flow:
 
@@ -184,10 +184,10 @@ The interesting lines are:
 [saml-jwe-auth debug] SAML attributes=...
 ```
 
-For full copy/paste values, use the files written under `build/saml-debug` on the host:
+For full copy/paste values, use the files written under `saml-plugin-outputs` on the host:
 
 ```powershell
-$latest = Get-ChildItem .\build\saml-debug\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$latest = Get-ChildItem .\saml-plugin-outputs\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 Get-Content -Raw $latest.FullName
 ```
 
