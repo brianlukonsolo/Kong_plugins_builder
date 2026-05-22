@@ -215,6 +215,25 @@ X-Authenticated-User: alice
 X-Authenticated-Email: alice@example.test
 ```
 
+Inspect the SAML response debug logs:
+
+```powershell
+docker compose logs -f kong | Select-String "saml-jwe-auth debug"
+```
+
+The local `kong/kong.yml` demo config currently has `debug_enabled`, `debug_log_saml_response`, and `debug_log_max_bytes` turned on for this SAML route. The log shows the received `SAMLResponse` POST value, decoded SAML XML, validation result, subject, and mapped attributes.
+
+For the full copyable base64 value, use the capture file written to `build/saml-debug`:
+
+```powershell
+$latest = Get-ChildItem .\build\saml-debug\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content -Raw $latest.FullName
+```
+
+The matching decoded XML file uses the same prefix and ends with `_saml-response.xml`.
+
+Turn `debug_log_saml_response` and `debug_capture_dir` off after troubleshooting if you do not want signed SAML XML and user attributes in logs or local capture files.
+
 ## 9. 🧩 Test A New Plugin
 
 After adding a new plugin under `custom-plugins/`:

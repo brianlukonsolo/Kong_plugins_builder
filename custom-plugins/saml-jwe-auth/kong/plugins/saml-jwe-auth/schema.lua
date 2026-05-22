@@ -120,6 +120,28 @@ return {
               default = true,
             },
           },
+          { debug_enabled = {
+              type = "boolean",
+              default = false,
+            },
+          },
+          { debug_log_saml_response = {
+              type = "boolean",
+              default = false,
+            },
+          },
+          { debug_log_max_bytes = {
+              type = "integer",
+              default = 4096,
+              between = { 256, 262144 },
+            },
+          },
+          { debug_capture_dir = {
+              type = "string",
+              default = "",
+              len_min = 0,
+            },
+          },
           { attribute_mappings = {
               type = "array",
               default = {},

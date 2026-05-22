@@ -114,6 +114,10 @@ plugins:
       session_cookie_name: kong_saml_session
       session_cookie_secure: false
       session_cookie_same_site: Lax
+      debug_enabled: false
+      debug_log_saml_response: false
+      debug_log_max_bytes: 4096
+      debug_capture_dir: ""
       attribute_mappings:
         - claim: email
           saml_attribute: email
@@ -145,6 +149,58 @@ http://localhost:18080/realms/kong-plugin-lab/protocol/saml/descriptor
 For local Compose, `kong/kong.yml` uses the internal metadata URL `http://keycloak:8080/realms/kong-plugin-lab/protocol/saml/descriptor`. You can also configure `idp_certificate_pem` directly if you want certificate pinning without metadata fetches.
 
 The complete working Keycloak/Kong SAML value table is in `keycloak/README.md` under "Complete SAML Configuration Reference".
+
+## Debug SAML Responses
+
+The plugin has an explicit local debug mode for inspecting the ACS callback. The checked-in demo config in `kong/kong.yml` enables it so you can see what Keycloak posts back to Kong.
+
+| Config | Local value | What it does |
+| --- | --- | --- |
+| `debug_enabled` | `true` | Writes SAML flow debug lines to the Kong container log. |
+| `debug_log_saml_response` | `true` | Logs the raw `SAMLResponse` POST value and the decoded XML. |
+| `debug_log_max_bytes` | `20000` | Truncates large logged SAML values after this many bytes. |
+| `debug_capture_dir` | `/kong-saml-debug` | Writes full, copyable debug files into the mounted `build/saml-debug` folder. |
+
+Watch the plugin logs while you run the browser flow:
+
+```powershell
+docker compose logs -f kong | Select-String "saml-jwe-auth debug"
+```
+
+On a shell with `grep`:
+
+```sh
+docker compose logs -f kong | grep "saml-jwe-auth debug"
+```
+
+The interesting lines are:
+
+```text
+[saml-jwe-auth debug] received ACS POST saml_response_b64_bytes=...
+[saml-jwe-auth debug] SAMLResponse POST value bytes=...
+[saml-jwe-auth debug] decoded SAMLResponse XML bytes=...
+[saml-jwe-auth debug] wrote debug capture file=/kong-saml-debug/...
+[saml-jwe-auth debug] SAML response signature and conditions validated
+[saml-jwe-auth debug] SAML attributes=...
+```
+
+For full copy/paste values, use the files written under `build/saml-debug` on the host:
+
+```powershell
+$latest = Get-ChildItem .\build\saml-debug\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content -Raw $latest.FullName
+```
+
+Each successful ACS POST writes matching files:
+
+```text
+<timestamp>_<request-id>_saml-response.b64
+<timestamp>_<request-id>_saml-response.xml
+<timestamp>_<request-id>_relay-state.txt
+<timestamp>_<request-id>_manifest.json
+```
+
+The decoded XML and capture files contain user identity data and signed assertion material. Keep `debug_log_saml_response` and `debug_capture_dir` off anywhere outside local troubleshooting.
 
 ## Build And Verify
 

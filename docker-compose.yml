@@ -89,6 +89,7 @@ services:
       - "${KONG_STATUS_PORT:-8100}:8100"
     volumes:
       - ./build/out:/rocks:ro
+      - ./build/saml-debug:/kong-saml-debug
       - ./kong/kong.yml:/kong/declarative/kong.yml:ro
     healthcheck:
       test: ["CMD", "kong", "health"]

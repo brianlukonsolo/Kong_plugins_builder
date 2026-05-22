@@ -204,6 +204,10 @@ These values live in `kong/kong.yml` under the `saml-jwe-auth` plugin config.
 | `relay_state_ttl_seconds` | `300` | Encrypted RelayState lifetime while the user is at the IdP. |
 | `clock_skew_seconds` | `120` | Allowed SAML assertion clock skew. |
 | `require_replay_protection` | `true` | Stores assertion IDs in Kong shared memory to block replay. |
+| `debug_enabled` | `true` | Local troubleshooting flag that writes SAML flow details to the Kong container log. |
+| `debug_log_saml_response` | `true` | Logs the raw `SAMLResponse` POST value and decoded SAML XML. Disable outside local debugging. |
+| `debug_log_max_bytes` | `20000` | Truncates large debug values after this many bytes. |
+| `debug_capture_dir` | `/kong-saml-debug` | Container path mounted to host `build/saml-debug` for full SAMLResponse capture files. |
 | `attribute_mappings[0].claim` | `email` | JWE claim name for email. |
 | `attribute_mappings[0].saml_attribute` | `email` | SAML attribute read from the Assertion. |
 | `attribute_mappings[0].upstream_header` | `X-Authenticated-Email` | Header sent to the upstream. |

@@ -681,6 +681,21 @@ Run the full SAML login journey check inside Docker Compose with:
 docker compose run --rm --entrypoint node newman /etc/newman/saml-browser-flow-check.js
 ```
 
+Inspect the SAML response from the Kong plugin logs:
+
+```powershell
+docker compose logs -f kong | Select-String "saml-jwe-auth debug"
+```
+
+The local demo config logs the received `SAMLResponse`, decoded SAML XML, validation result, subject, and mapped attributes. Disable `debug_log_saml_response` in `kong/kong.yml` when you do not want signed SAML XML and user attributes written to logs.
+
+For the full copyable `SAMLResponse` value, use the capture files in `build/saml-debug`:
+
+```powershell
+$latest = Get-ChildItem .\build\saml-debug\*_saml-response.b64 | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content -Raw $latest.FullName
+```
+
 ## 🧭 Manual Checks
 
 Start Kong:

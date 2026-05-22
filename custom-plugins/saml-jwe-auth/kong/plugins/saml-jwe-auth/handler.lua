@@ -107,6 +107,119 @@ local function native_error(buf)
 end
 
 
+local function debug_log(conf, ...)
+  if conf.debug_enabled then
+    kong.log.notice("[saml-jwe-auth debug] ", ...)
+  end
+end
+
+
+local function debug_log_value(conf, label, value)
+  if not conf.debug_enabled or not conf.debug_log_saml_response then
+    return
+  end
+
+  value = tostring(value or "")
+  local max_bytes = conf.debug_log_max_bytes or 4096
+  local truncated = #value > max_bytes
+  local display = truncated and value:sub(1, max_bytes) or value
+
+  debug_log(conf, label, " bytes=", #value, " value=", display)
+
+  if truncated then
+    debug_log(conf, label, " truncated_bytes=", #value - max_bytes)
+  end
+end
+
+
+local function safe_debug_filename_part(value)
+  value = tostring(value or "")
+  value = value:gsub("[^%w._-]", "_")
+
+  if value == "" then
+    return "unknown"
+  end
+
+  if #value > 96 then
+    return value:sub(1, 96)
+  end
+
+  return value
+end
+
+
+local function debug_write_file(conf, filename, value)
+  if not conf.debug_enabled then
+    return nil
+  end
+
+  local dir = conf.debug_capture_dir
+  if type(dir) ~= "string" or dir == "" then
+    return nil
+  end
+
+  dir = dir:gsub("[/\\]+$", "")
+  local path = dir .. "/" .. filename
+  value = tostring(value or "")
+
+  local file, open_err = io.open(path, "wb")
+  if not file then
+    debug_log(conf, "could not write debug capture file=", path, " error=", tostring(open_err))
+    return nil
+  end
+
+  local ok, write_err = file:write(value)
+  local close_ok, close_err = file:close()
+
+  if not ok then
+    debug_log(conf, "could not write debug capture file=", path, " error=", tostring(write_err))
+    return nil
+  end
+
+  if not close_ok then
+    debug_log(conf, "could not close debug capture file=", path, " error=", tostring(close_err))
+    return nil
+  end
+
+  debug_log(conf, "wrote debug capture file=", path, " bytes=", #value)
+  return path
+end
+
+
+local function debug_capture_saml(conf, relay, saml_response, relay_state, xml)
+  if not conf.debug_enabled then
+    return
+  end
+
+  local dir = conf.debug_capture_dir
+  if type(dir) ~= "string" or dir == "" then
+    return
+  end
+
+  local request_id = relay and relay.request_id or "unknown"
+  local prefix = os.date("!%Y%m%dT%H%M%SZ", ngx.time())
+      .. "_"
+      .. safe_debug_filename_part(request_id)
+
+  local b64_path = debug_write_file(conf, prefix .. "_saml-response.b64", saml_response)
+  local xml_path = debug_write_file(conf, prefix .. "_saml-response.xml", xml)
+  local relay_path = debug_write_file(conf, prefix .. "_relay-state.txt", relay_state)
+
+  local manifest = cjson.encode({
+    created_at = os.date("!%Y-%m-%dT%H:%M:%SZ", ngx.time()),
+    request_id = request_id,
+    saml_response_b64_bytes = #(saml_response or ""),
+    saml_response_xml_bytes = #(xml or ""),
+    relay_state_bytes = #(relay_state or ""),
+    saml_response_b64_file = b64_path,
+    saml_response_xml_file = xml_path,
+    relay_state_file = relay_path,
+  })
+
+  debug_write_file(conf, prefix .. "_manifest.json", manifest or "{}")
+end
+
+
 local function base64url_encode(value)
   return (ngx.encode_base64(value):gsub("+", "-"):gsub("/", "_"):gsub("=", ""))
 end
@@ -506,10 +619,11 @@ local function start_login(conf)
   end
 
   local now = ngx.time()
+  local return_to = safe_return_to(request_uri())
   local relay, relay_err = encrypt_jwe(conf, {
     typ = "saml-relay",
     request_id = request_id,
-    return_to = safe_return_to(request_uri()),
+    return_to = return_to,
     iat = now,
     exp = now + conf.relay_state_ttl_seconds,
   })
@@ -523,6 +637,12 @@ local function start_login(conf)
   if not deflated then
     return kong.response.exit(500, { message = deflate_err })
   end
+
+  debug_log(conf,
+      "starting SAML login request_id=", request_id,
+      " return_to=", return_to,
+      " acs=", conf.assertion_consumer_service_url,
+      " idp_sso_url=", conf.idp_sso_url)
 
   local location = append_query(conf.idp_sso_url, {
     "SAMLRequest=" .. ngx.escape_uri(ngx.encode_base64(deflated)),
@@ -543,10 +663,11 @@ local function start_login_post(conf)
   end
 
   local now = ngx.time()
+  local return_to = safe_return_to(request_uri())
   local relay, relay_err = encrypt_jwe(conf, {
     typ = "saml-relay",
     request_id = request_id,
-    return_to = safe_return_to(request_uri()),
+    return_to = return_to,
     iat = now,
     exp = now + conf.relay_state_ttl_seconds,
   })
@@ -557,6 +678,12 @@ local function start_login_post(conf)
 
   local request_xml = build_authn_request(conf, request_id)
   local html = auto_post_form(conf.idp_sso_url, ngx.encode_base64(request_xml), relay)
+
+  debug_log(conf,
+      "starting SAML POST login request_id=", request_id,
+      " return_to=", return_to,
+      " acs=", conf.assertion_consumer_service_url,
+      " idp_sso_url=", conf.idp_sso_url)
 
   return kong.response.exit(200, html, {
     ["Content-Type"] = "text/html; charset=utf-8",
@@ -733,6 +860,11 @@ local function handle_acs(conf)
     return kong.response.exit(400, { message = "missing RelayState" })
   end
 
+  debug_log(conf,
+      "received ACS POST saml_response_b64_bytes=", #saml_response,
+      " relay_state_bytes=", #relay_state)
+  debug_log_value(conf, "SAMLResponse POST value", saml_response)
+
   local relay, relay_err = decrypt_jwe(conf, relay_state)
   if not relay or relay.typ ~= "saml-relay" then
     return kong.response.exit(400, { message = "invalid RelayState", detail = relay_err })
@@ -743,24 +875,35 @@ local function handle_acs(conf)
     return kong.response.exit(400, { message = "invalid SAMLResponse encoding" })
   end
 
+  debug_log(conf, "decoded SAMLResponse XML bytes=", #xml)
+  debug_log_value(conf, "decoded SAMLResponse XML", xml)
+  debug_capture_saml(conf, relay, saml_response, relay_state, xml)
+
   local ok, validate_err = validate_saml_response(conf, xml)
   if not ok then
     kong.log.warn("SAML response validation failed: ", validate_err)
     return kong.response.exit(401, { message = "invalid SAMLResponse" })
   end
 
+  debug_log(conf, "SAML response signature and conditions validated")
+
   local in_response_to = extract_from_saml(xml, "response_in_response_to")
+  debug_log(conf,
+      "SAML InResponseTo=", tostring(in_response_to),
+      " relay_request_id=", tostring(relay.request_id))
   if in_response_to ~= relay.request_id then
     return kong.response.exit(401, { message = "SAML response did not match RelayState request" })
   end
 
   local assertion_id = extract_from_saml(xml, "assertion_id")
+  debug_log(conf, "SAML assertion_id=", tostring(assertion_id))
   local remembered, replay_err = remember_assertion(conf, assertion_id)
   if not remembered then
     return kong.response.exit(401, { message = replay_err })
   end
 
   local subject = extract_from_saml(xml, "nameid") or ""
+  debug_log(conf, "SAML subject=", subject)
   if subject == "" then
     return kong.response.exit(401, { message = "SAML assertion did not contain a NameID" })
   end
@@ -772,6 +915,8 @@ local function handle_acs(conf)
       attrs[mapping.claim] = value
     end
   end
+
+  debug_log(conf, "SAML attributes=", cjson.encode(attrs) or "{}")
 
   local now = ngx.time()
   local session_token, token_err = encrypt_jwe(conf, {
@@ -786,6 +931,10 @@ local function handle_acs(conf)
   if not session_token then
     return kong.response.exit(500, { message = token_err })
   end
+
+  debug_log(conf,
+      "issued SAML JWE session subject=", subject,
+      " return_to=", safe_return_to(relay.return_to))
 
   return kong.response.exit(302, nil, {
     ["Location"] = safe_return_to(relay.return_to),
