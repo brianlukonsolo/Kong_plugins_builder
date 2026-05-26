@@ -70,8 +70,9 @@ services:
           relay_state_ttl_seconds: 300
           clock_skew_seconds: 120
           require_replay_protection: true
-          # Local troubleshooting only: this logs the received SAMLResponse and decoded XML.
+          # Local troubleshooting only: this logs SAML request/response values and decoded XML.
           debug_enabled: true
+          debug_log_saml_request: true
           debug_log_saml_response: true
           debug_log_max_bytes: 20000
           debug_capture_dir: /kong-saml-debug

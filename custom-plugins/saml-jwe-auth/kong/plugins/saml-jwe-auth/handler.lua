@@ -114,8 +114,8 @@ local function debug_log(conf, ...)
 end
 
 
-local function debug_log_value(conf, label, value)
-  if not conf.debug_enabled or not conf.debug_log_saml_response then
+local function debug_log_value(conf, label, value, enabled)
+  if not conf.debug_enabled or not enabled then
     return
   end
 
@@ -217,6 +217,41 @@ local function debug_capture_saml(conf, relay, saml_response, relay_state, xml)
   })
 
   debug_write_file(conf, prefix .. "_manifest.json", manifest or "{}")
+end
+
+
+local function debug_capture_saml_request(conf, request_id, binding, saml_request, relay_state, xml)
+  if not conf.debug_enabled or not conf.debug_log_saml_request then
+    return
+  end
+
+  local dir = conf.debug_capture_dir
+  if type(dir) ~= "string" or dir == "" then
+    return
+  end
+
+  local safe_binding = safe_debug_filename_part(binding)
+  local prefix = os.date("!%Y%m%dT%H%M%SZ", ngx.time())
+      .. "_"
+      .. safe_debug_filename_part(request_id)
+
+  local b64_path = debug_write_file(conf, prefix .. "_saml-request-" .. safe_binding .. ".b64", saml_request)
+  local xml_path = debug_write_file(conf, prefix .. "_saml-request.xml", xml)
+  local relay_path = debug_write_file(conf, prefix .. "_relay-state.txt", relay_state)
+
+  local manifest = cjson.encode({
+    created_at = os.date("!%Y-%m-%dT%H:%M:%SZ", ngx.time()),
+    request_id = request_id,
+    binding = binding,
+    saml_request_b64_bytes = #(saml_request or ""),
+    saml_request_xml_bytes = #(xml or ""),
+    relay_state_bytes = #(relay_state or ""),
+    saml_request_b64_file = b64_path,
+    saml_request_xml_file = xml_path,
+    relay_state_file = relay_path,
+  })
+
+  debug_write_file(conf, prefix .. "_saml-request-manifest.json", manifest or "{}")
 end
 
 
@@ -637,15 +672,19 @@ local function start_login(conf)
   if not deflated then
     return kong.response.exit(500, { message = deflate_err })
   end
+  local request_b64 = ngx.encode_base64(deflated)
 
   debug_log(conf,
       "starting SAML login request_id=", request_id,
       " return_to=", return_to,
       " acs=", conf.assertion_consumer_service_url,
       " idp_sso_url=", conf.idp_sso_url)
+  debug_log_value(conf, "SAMLRequest Redirect value", request_b64, conf.debug_log_saml_request)
+  debug_log_value(conf, "AuthnRequest XML", request_xml, conf.debug_log_saml_request)
+  debug_capture_saml_request(conf, request_id, "redirect", request_b64, relay, request_xml)
 
   local location = append_query(conf.idp_sso_url, {
-    "SAMLRequest=" .. ngx.escape_uri(ngx.encode_base64(deflated)),
+    "SAMLRequest=" .. ngx.escape_uri(request_b64),
     "RelayState=" .. ngx.escape_uri(relay),
   })
 
@@ -677,13 +716,17 @@ local function start_login_post(conf)
   end
 
   local request_xml = build_authn_request(conf, request_id)
-  local html = auto_post_form(conf.idp_sso_url, ngx.encode_base64(request_xml), relay)
+  local request_b64 = ngx.encode_base64(request_xml)
+  local html = auto_post_form(conf.idp_sso_url, request_b64, relay)
 
   debug_log(conf,
       "starting SAML POST login request_id=", request_id,
       " return_to=", return_to,
       " acs=", conf.assertion_consumer_service_url,
       " idp_sso_url=", conf.idp_sso_url)
+  debug_log_value(conf, "SAMLRequest POST value", request_b64, conf.debug_log_saml_request)
+  debug_log_value(conf, "AuthnRequest XML", request_xml, conf.debug_log_saml_request)
+  debug_capture_saml_request(conf, request_id, "post", request_b64, relay, request_xml)
 
   return kong.response.exit(200, html, {
     ["Content-Type"] = "text/html; charset=utf-8",
@@ -863,7 +906,7 @@ local function handle_acs(conf)
   debug_log(conf,
       "received ACS POST saml_response_b64_bytes=", #saml_response,
       " relay_state_bytes=", #relay_state)
-  debug_log_value(conf, "SAMLResponse POST value", saml_response)
+  debug_log_value(conf, "SAMLResponse POST value", saml_response, conf.debug_log_saml_response)
 
   local relay, relay_err = decrypt_jwe(conf, relay_state)
   if not relay or relay.typ ~= "saml-relay" then
@@ -876,7 +919,7 @@ local function handle_acs(conf)
   end
 
   debug_log(conf, "decoded SAMLResponse XML bytes=", #xml)
-  debug_log_value(conf, "decoded SAMLResponse XML", xml)
+  debug_log_value(conf, "decoded SAMLResponse XML", xml, conf.debug_log_saml_response)
   debug_capture_saml(conf, relay, saml_response, relay_state, xml)
 
   local ok, validate_err = validate_saml_response(conf, xml)

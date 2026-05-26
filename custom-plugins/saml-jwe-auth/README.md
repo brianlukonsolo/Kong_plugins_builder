@@ -115,6 +115,7 @@ plugins:
       session_cookie_secure: false
       session_cookie_same_site: Lax
       debug_enabled: false
+      debug_log_saml_request: false
       debug_log_saml_response: false
       debug_log_max_bytes: 4096
       debug_capture_dir: ""
@@ -157,9 +158,10 @@ The plugin has an explicit local debug mode for inspecting the ACS callback. The
 | Config | Local value | What it does |
 | --- | --- | --- |
 | `debug_enabled` | `true` | Writes SAML flow debug lines to the Kong container log. |
+| `debug_log_saml_request` | `true` | Logs the outgoing `SAMLRequest` value and AuthnRequest XML. |
 | `debug_log_saml_response` | `true` | Logs the raw `SAMLResponse` POST value and the decoded XML. |
 | `debug_log_max_bytes` | `20000` | Truncates large logged SAML values after this many bytes. |
-| `debug_capture_dir` | `/kong-saml-debug` | Writes full, copyable debug files into the mounted `saml-plugin-outputs` folder. |
+| `debug_capture_dir` | `/kong-saml-debug` | Writes full, copyable request/response debug files into the mounted `saml-plugin-outputs` folder. |
 
 Watch the plugin logs while you run the browser flow:
 
@@ -176,6 +178,9 @@ docker compose logs -f kong | grep "saml-jwe-auth debug"
 The interesting lines are:
 
 ```text
+[saml-jwe-auth debug] starting SAML login request_id=...
+[saml-jwe-auth debug] SAMLRequest Redirect value bytes=...
+[saml-jwe-auth debug] AuthnRequest XML bytes=...
 [saml-jwe-auth debug] received ACS POST saml_response_b64_bytes=...
 [saml-jwe-auth debug] SAMLResponse POST value bytes=...
 [saml-jwe-auth debug] decoded SAMLResponse XML bytes=...
@@ -191,16 +196,19 @@ $latest = Get-ChildItem .\saml-plugin-outputs\*_saml-response.b64 | Sort-Object 
 Get-Content -Raw $latest.FullName
 ```
 
-Each successful ACS POST writes matching files:
+A browser flow writes request and response files with the same request ID:
 
 ```text
+<timestamp>_<request-id>_saml-request-redirect.b64
+<timestamp>_<request-id>_saml-request.xml
+<timestamp>_<request-id>_saml-request-manifest.json
 <timestamp>_<request-id>_saml-response.b64
 <timestamp>_<request-id>_saml-response.xml
 <timestamp>_<request-id>_relay-state.txt
 <timestamp>_<request-id>_manifest.json
 ```
 
-The decoded XML and capture files contain user identity data and signed assertion material. Keep `debug_log_saml_response` and `debug_capture_dir` off anywhere outside local troubleshooting.
+The decoded response XML and capture files contain user identity data and signed assertion material. Keep `debug_log_saml_request`, `debug_log_saml_response`, and `debug_capture_dir` off anywhere outside local troubleshooting.
 
 ## Build And Verify
 

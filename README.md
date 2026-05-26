@@ -687,7 +687,7 @@ Inspect the SAML response from the Kong plugin logs:
 docker compose logs -f kong | Select-String "saml-jwe-auth debug"
 ```
 
-The local demo config logs the received `SAMLResponse`, decoded SAML XML, validation result, subject, and mapped attributes. Disable `debug_log_saml_response` in `kong/kong.yml` when you do not want signed SAML XML and user attributes written to logs.
+The local demo config logs the outgoing `SAMLRequest`, AuthnRequest XML, received `SAMLResponse`, decoded SAML XML, validation result, subject, and mapped attributes. Disable `debug_log_saml_request`, `debug_log_saml_response`, and `debug_capture_dir` in `kong/kong.yml` when you do not want SAML values, signed SAML XML, and user attributes written to logs or capture files.
 
 For the full copyable `SAMLResponse` value, use the capture files in `saml-plugin-outputs`:
 

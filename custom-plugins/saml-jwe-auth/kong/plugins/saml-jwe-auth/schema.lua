@@ -130,6 +130,11 @@ return {
               default = false,
             },
           },
+          { debug_log_saml_request = {
+              type = "boolean",
+              default = false,
+            },
+          },
           { debug_log_max_bytes = {
               type = "integer",
               default = 4096,
